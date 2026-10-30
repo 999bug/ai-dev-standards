@@ -66,28 +66,92 @@ profile 里如果还有未定项，先列出来问我，不要猜。
 
 本仓库同时是一个 Claude Code 插件市场：`.claude-plugin/` 下有 `plugin.json`（插件清单）和 `marketplace.json`（市场清单），skill 在 `skills/ai-dev-standards/`。
 
+### 安装
+
 ```bash
+cd /path/to/your-project
+
 claude plugin marketplace add 999bug/ai-dev-standards
-claude plugin install ai-dev-standards@ai-dev-standards
+claude plugin install ai-dev-standards@ai-dev-standards --scope local
 ```
 
-Claude Code v2.1.292+ 可以一条命令装完：
+`--scope` 决定装给谁，**不写就是 `user`（所有项目都能用）**：
+
+| scope | 写到哪 | 谁生效 | 进 git |
+| --- | --- | --- | --- |
+| `user`（默认） | `~/.claude/settings.json` | 你所有项目 | 否 |
+| `project` | `.claude/settings.json` | 仓库所有协作者 | 是 |
+| `local` | `.claude/settings.local.json` | 你，仅此仓库 | 否（自动 gitignore） |
+
+只在一个项目里用，一定要加 `--scope local`，否则会全局生效。
+
+Claude Code v2.1.292+ 也能一条命令装完：
 
 ```bash
-claude plugin install ai-dev-standards --marketplace 999bug/ai-dev-standards
+claude plugin install ai-dev-standards --marketplace 999bug/ai-dev-standards --scope local
 ```
 
-装好后在任意项目里说「给这个项目装 AI 开发规范」，skill 会调用安装器。更新用 `claude plugin update ai-dev-standards@ai-dev-standards`。
+### 装完为什么项目里没有文件
 
-**插件自带 SessionStart hook**：装好后首次在某个 git 项目里启动会话，如果该项目还没有 `AGENTS.md`，会自动装一遍（幂等，装过就不再动）。不想被自动装的项目放一个豁免标记：
+这是最容易误解的一点：**`claude plugin install` 只把插件复制到 `~/.claude/plugins/cache/`，它不碰你的项目。**
+
+往项目里写 `AGENTS.md`、`.agents/` 的是插件自带的 SessionStart hook。hook 要同时满足三个条件才动作：
+
+1. **当前目录是 git 仓库** —— 临时目录、家目录、随手建的文件夹全部静默跳过
+2. **项目里没有 `AGENTS.md`** —— 已经装过就什么都不做（幂等，不会每次会话重写）
+3. **没有豁免标记** `.claude/no-ai-dev-standards`
+
+三个条件都满足，**还要退出重进一次会话**才会触发。装完插件不重启会话，当前会话不会跑 hook。
+
+成功时屏幕上会出现：
+
+```
+[ai-dev-standards] 本项目还没有 AI 开发规范，已自动安装。
+  写入 16 个文件，跳过 0 个已存在的文件
+```
+
+什么都没输出，按顺序排查：是不是 git 仓库 → 是不是已经装过 → 有没有豁免标记 → 都没有就跑 `claude --debug` 看 hook 有没有加载。
+
+不想等 hook，直接手动装等价：
 
 ```bash
+bash ~/.claude/plugins/cache/ai-dev-standards/ai-dev-standards/1.1.0/install.sh . --with-hooks --with-ci
+```
+
+### 项目已有 CLAUDE.md 时
+
+安装器默认不覆盖已存在文件，项目里原有的 `CLAUDE.md` 会被跳过。但那样 `AGENTS.md` 装了也**不会被 Claude 读到**——必须在 `CLAUDE.md` 的**第一行**手动加：
+
+```markdown
+@AGENTS.md
+
+```
+
+原有内容一行不用动。
+
+### 验证是否生效
+
+新开会话问：
+
+> 按你读到的规范回答：① 改 Java 代码前要先读哪个文件？② 提交信息的类型有哪些？
+
+正确答案是 `.agents/lang-java.md` 和 `NF/BF/IM/SC/CU/RF/Doc/OT/Tag`。答不出来说明 `@AGENTS.md` 那行没加对。
+
+### 豁免与卸载
+
+```bash
+# 单个项目永久豁免（公司项目、别人的仓库建议都加上）
 mkdir -p .claude && touch .claude/no-ai-dev-standards
+
+# 单次会话豁免
+AI_DEV_STANDARDS_SKIP=1 claude
+
+# 更新与卸载（scope 要和你安装时一致）
+claude plugin update    ai-dev-standards@ai-dev-standards --scope local
+claude plugin uninstall ai-dev-standards@ai-dev-standards --scope local
 ```
 
-单次会话跳过：`AI_DEV_STANDARDS_SKIP=1 claude`。
-
-发布侧没有提交表单：`marketplace.json` 推进仓库即视为发布。详情见 [`references/claude-code.md`](references/claude-code.md)。
+发布侧没有提交表单：`marketplace.json` 推进仓库即视为发布。机制细节与 scope 优先级见 [`references/claude-code.md`](references/claude-code.md)。
 
 ## 作为 WorkBuddy skill 使用
 

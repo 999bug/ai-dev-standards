@@ -104,6 +104,18 @@ Windows 上是 `C:\Users\<用户名>\.claude\skills\ai-dev-standards`。这种�
 
 stdout 会进入 Claude 的上下文，所以 Claude 会知道刚装了什么、下一步该填 profile。
 
+### 三个容易误解的点
+
+**① 需要 1.1.0 及以上。** 1.0.0 只有 skill，没有 hook，装了不会自动安装。确认版本：
+
+```bash
+claude plugin list
+```
+
+**② 装完插件不会立刻生效。** `plugin install` 只把文件复制到 `~/.claude/plugins/cache/`，不执行任何脚本——Claude Code 没有 post-install 钩子。必须退出会话再重进，SessionStart 才会触发。
+
+**③ 项目已有 `CLAUDE.md` 时要手动接一下。** 安装器不覆盖已有文件，会跳过它。但那样 `AGENTS.md` 装了也读不到，得在 `CLAUDE.md` 第一行加 `@AGENTS.md`。
+
 ### 为什么放在插件里而不是用户全局配置
 
 | 方案 | 作用域 | 副作用 |
