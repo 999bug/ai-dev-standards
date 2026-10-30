@@ -1,64 +1,26 @@
-HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+# 本仓库是纯文档仓库（Markdown 规范文件），不要照抄 Java/Python 项目的忽略列表。
+# 新增忽略项前先判断：它是「本仓库产生的」，还是「别的项目残留的」？
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-.mvn*
-mvnw
-mvnw.cmd
-.gitattributes
-.m2
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
+# 本地编辑器与系统文件
+.idea/
 .vscode/
-native_wrapper/Lib/libboundscheck/obj
-native_wrapper/Lib/libboundscheck.a
-log
-python/__pycache__/cv_api_client.cpython-314.pyc
-python/__pycache__/cv_config.cpython-314.pyc
-python/__pycache__/cv_dump.cpython-314.pyc
-python/__pycache__/cv_formatters.cpython-314.pyc
-python/__pycache__/cv_jobs.cpython-314.pyc
-python/__pycache__/cv_output.cpython-314.pyc
-python/__pycache__/cv_restore_file.cpython-314.pyc
-python/__pycache__/cv_restore_oracle.cpython-314.pyc
-python/__pycache__/cv_restore.cpython-314.pyc
-python/__pycache__/cv_validators.cpython-314.pyc
-# Understand Anything 分析工具（仅提交 knowledge-graph.json）
-.understand-anything/diff-overlay.json
-.understand-anything/intermediate/
-.understand-anything/tmp/
-.understand-anything/.trash-*/
-.understand-anything/fingerprints.json
-/test.json
+*.iml
+.DS_Store
+Thumbs.db
 
-# PuTTY tools
-plink.exe
-pscp.exe
+# 临时文件与草稿
+*.tmp
+*.bak
+*~
+*.orig
+*.rej
 
-.codegraph
+# 本地私有记录：承接确实需要保存的敏感标识，永不入库
+# （用法见 .agents/discipline.md 第 5 节）
+LOCAL-ONLY.md
+
+# CodeGraph 索引，可由 `codegraph` 重建
+.codegraph/
+
+# 该跟踪的配置文件，不要误伤
+!.gitattributes
