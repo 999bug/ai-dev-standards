@@ -143,7 +143,10 @@ bash scripts/check.sh
 | `templates/github/check.yml` | 目标项目的 CI | 自检 + 历史邮箱扫描，`--with-ci` 时安装 |
 | `scripts/check.sh` | 本地或 CI | 五项自检，见上节 |
 | `SKILL.md` | agent 会话 | 作为 WorkBuddy skill 使用时的入口 |
-| `references/` | 按需查阅 | profile 填写指南、运作原理、扩展模块写法 |
+| `references/profile-guide.md` | 填 profile 时 | 每一节的含义、常见错误、三条红线 |
+| `references/how-it-works.md` | 想改这套体系前 | 分层加载、规则三档、三门禁的原理 |
+| `references/extending.md` | 加语言 / 平台模块时 | 结构模板、登记规则、反模式 |
+| `references/claude-code.md` | 在 Claude Code 里用 | 加载链、验证方法、五个注意点 |
 | `reviews/` | 新增规则前 | 待审批的经验提取报告，格式见 `reviews/README.md` |
 
 ## 设计原则（改动前先读）
@@ -158,7 +161,7 @@ bash scripts/check.sh
 ## 工具兼容
 
 - `AGENTS.md` 是跨工具事实标准（Codex / Cursor / Jules 等直接读根目录）。
-- Claude Code 只认 `CLAUDE.md`：本仓库已提供，内容是一行 `@AGENTS.md`。安装时会一起带上。
+- Claude Code 只认 `CLAUDE.md`：本仓库已提供，内容是一行 `@AGENTS.md`，安装时一起带上。加载链、验证方法与五个坑见 [`references/claude-code.md`](references/claude-code.md)。
 - 有的工具要求小写 `agent.md`：`git mv AGENTS.md agent.md` 或建软链，不要维护两份。
 - 需要目录级规则时，可在子目录放 `AGENTS.md` 补差异，但**不要在子文件里重复根文件的内容**。
 

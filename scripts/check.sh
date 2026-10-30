@@ -82,8 +82,12 @@ fi
 
 # ---------------------------------------------------------------- 4. 交叉引用
 section "4. 交叉引用的文件存在"
-# 已知的仓库外文档与约定文件名，不参与检查
-external="CodeCommitGuide.md LOCAL-ONLY.md agent.md"
+# 已知存在于仓库之外的文件名，不参与存在性检查：
+#   CodeCommitGuide.md  公司内部提交规范，不在本仓库
+#   LOCAL-ONLY.md       本地私有记录，按约定永不入库
+#   CLAUDE.local.md     Claude Code 的个人偏好文件，按约定不入库
+#   agent.md            部分工具要求的小写入口，由使用者自行改名产生
+external="CodeCommitGuide.md LOCAL-ONLY.md CLAUDE.local.md agent.md"
 broken=""
 refs=$(grep -ohE '`[A-Za-z0-9_./-]+\.md`' $docs 2>/dev/null | tr -d '`' | sort -u)
 for ref in $refs; do
