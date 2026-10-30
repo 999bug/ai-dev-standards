@@ -1,32 +1,48 @@
 # AI 开发规范
 
-一套可复制的规范文件，放进任意新项目根目录即生效。目标是**让 AI 按你的意图开发**，而不是按它的默认习惯。
+一套可复制的规范文件，装进任意新项目根目录即生效。目标是**让 AI 按你的意图开发**，而不是按它的默认习惯。
 
 `AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 10 个模块；配套 `commit-msg` 钩子与 CI 自检，把「规范」从文档里的红线变成会失败的提交与流水线。
 
-## 三步使用
+## 安装
+
+克隆本仓库，跑一条命令即可装到任意项目：
 
 ```bash
-# 1. 复制到项目根目录（AGENTS.md + .agents/ 下 10 个模块，共 11 个文件）
-cp AGENTS.md <project>/AGENTS.md
-cp -r .agents <project>/.agents
+git clone https://github.com/999bug/ai-dev-standards.git
+cd ai-dev-standards
+
+./install.sh /path/to/your-project --dry-run       # 先看会写哪些文件
+./install.sh /path/to/your-project --with-hooks --with-ci
 ```
 
-Windows PowerShell 用这个：
+Windows 用同目录下的 `install.ps1`（参数见下表，写法为 `-Target` / `-WithHooks` / `-WithCi` / `-Force` / `-DryRun`）。
 
-```powershell
-Copy-Item AGENTS.md <project>\AGENTS.md
-Copy-Item .agents <project>\.agents -Recurse
-```
+| 选项 | 作用 |
+| --- | --- |
+| （无） | `AGENTS.md` + `CLAUDE.md` + `.agents/` 10 个模块 + `scripts/check.sh` |
+| `--with-ci` | 加 `.github/workflows/check.yml`，每次 push / PR 自动自检 |
+| `--with-hooks` | 加 git 钩子并设置 `core.hooksPath`，提交格式不对直接拒绝 |
+| `--force` | 覆盖已存在文件 |
+| `--dry-run` | 只预览，不落盘 |
+
+**默认不覆盖已存在的文件**，装过一次后再跑是幂等的（写入 0，全部跳过）。要覆盖必须显式加 `--force`——目标项目可能已经改过某个模块，盲目覆盖等于抹掉别人的工作。
+
+## 装完必做：填 profile
+
+`.agents/project-profile.md` 里全是「未定」，逐项确认。
+
+**这是整套体系能否生效的关键。** 一份没填完的 profile 比没有 profile 更危险：AI 会拿示例值当事实，用"看起来合理"的默认值代替项目实际情况，然后一路错下去。
+
+字段说明与常见错误见 [`references/profile-guide.md`](references/profile-guide.md)。
+
+验证安装：
 
 ```bash
-# 2. 填 profile —— 唯一需要改的文件
-#    文件里全是「未定」，逐项确认。没想好的就留着未定：
-#    规范要求 AI 遇到未定必须停下来问你，不许拿示例值当事实。
-vi <project>/.agents/project-profile.md
-
-# 3. 开工。开场第一句给足信息（模板见下节）
+cd <project> && bash scripts/check.sh
 ```
+
+五项全绿才算装好。
 
 ## 会话开场模板
 
@@ -46,13 +62,21 @@ profile 里如果还有未定项，先列出来问我，不要猜。
 本次只修这个 bug，不顺手重构、不改样式、不升依赖；发现别的问题先报告。
 ```
 
-## 可选：装 git 钩子
+## 作为 WorkBuddy skill 使用
 
-两个钩子，作用不同，可以只装一个。
+仓库根目录有 `SKILL.md`，所以整个仓库就是一个 skill。安装到本地 skills 目录后，在任意项目里说「给这个项目装 AI 开发规范」即可自动执行：
 
-**`commit-msg`（建议装）**：按 `commit.md` 校验提交信息格式。类型大小写、是否带单号、有没有 AI 署名，不合格直接拒绝提交——把规范从"文档里的红线"变成"推不上去"。
+```bash
+git clone https://github.com/999bug/ai-dev-standards.git ~/.workbuddy/skills/ai-dev-standards
+```
 
-**`post-commit`（可选）**：项目里有 `.codegraph/` 时，提交后自动 `codegraph sync`。
+Windows 上是 `C:\Users\<用户名>\.workbuddy\skills\ai-dev-standards`。装完重启 WorkBuddy 生效。
+
+两种用法共用同一份模板，不需要维护两份。
+
+## 手动装钩子（可选）
+
+`install.sh --with-hooks` 会自动装。手工装的话：
 
 ```bash
 cd <project> && git config core.hooksPath <本仓库>/templates/githooks
@@ -61,15 +85,20 @@ cd <project> && git config core.hooksPath <本仓库>/templates/githooks
 或者复制进项目，让配置跟着仓库走：
 
 ```bash
-mkdir -p <project>/.githooks
-cp <本仓库>/templates/githooks/* <project>/.githooks/
-chmod +x <project>/.githooks/*
-cd <project> && git config core.hooksPath .githooks
+mkdir -p <project>/templates/githooks
+cp <本仓库>/templates/githooks/* <project>/templates/githooks/
+chmod +x <project>/templates/githooks/*
+cd <project> && git config core.hooksPath templates/githooks
 ```
+
+两个钩子作用不同：
+
+- **`commit-msg`**：按 `.agents/commit.md` 校验提交信息格式。类型大小写、是否带单号、有没有 AI 署名，不合格直接拒绝提交——把规范从"文档里的红线"变成"推不上去"。
+- **`post-commit`**：项目里有 `.codegraph/` 时，提交后自动 `codegraph sync`。
 
 四个设计要点（也是常见踩坑）：
 
-- 只在 `.codegraph/` 存在时执行，没建索引的项目不受影响。
+- `post-commit` 只在 `.codegraph/` 存在时执行，没建索引的项目不受影响。
 - **找不到 `codegraph` 命令、超时、同步失败，都只提示、不阻塞提交**——提交已经完成，不能因为索引失败让流水线/脚本误判。
 - 钩子的 `PATH` 常常和 IDE 里不同，所以留了 `CODEGRAPH_BIN`（可传绝对路径或整条命令，如 `npx -y codegraph`）。
 - 临时跳过：`SKIP_CODEGRAPH_SYNC=1` / `SKIP_COMMIT_MSG_CHECK=1`；同步默认 120 秒超时。
@@ -90,7 +119,7 @@ bash scripts/check.sh
 | 引用的 `.md` 文件存在 | 文档指向一个不存在的文件（本仓库自己就断过两次） |
 | 代码块成对闭合 | 漏一个 ``` 让后面全文变成代码 |
 
-仓库已配 `.github/workflows/check.yml`，每次 push / PR 自动跑，并额外扫描提交历史里的非匿名邮箱。
+本仓库已配 `.github/workflows/check.yml`，每次 push / PR 自动跑，并额外扫描提交历史里的非匿名邮箱。目标项目用 `--with-ci` 会装上同一份。
 
 ## 文件清单
 
@@ -108,9 +137,13 @@ bash scripts/check.sh
 | `.agents/release-github.md` | 发版、改 workflow | 触发策略、版本号、tag、Release、Pages、权限与 Secrets、回滚 |
 | `.agents/release-docker.md` | 改镜像/部署 | 镜像命名、多阶段与分层、healthcheck、挂载、compose、国内镜像、离线包 |
 | `CLAUDE.md` | Claude Code 会话 | 只有一行 `@AGENTS.md`，让只认 CLAUDE.md 的工具也能读到同一份规范 |
+| `install.sh` / `install.ps1` | 安装时 | 把上面这些装到目标项目，默认不覆盖已有文件 |
 | `templates/githooks/commit-msg` | 提交时 | 按 `commit.md` 校验格式，不合格拒绝提交 |
 | `templates/githooks/post-commit` | 提交后 | `codegraph sync`；失败/超时/缺命令一律只提示不阻塞 |
+| `templates/github/check.yml` | 目标项目的 CI | 自检 + 历史邮箱扫描，`--with-ci` 时安装 |
 | `scripts/check.sh` | 本地或 CI | 五项自检，见上节 |
+| `SKILL.md` | agent 会话 | 作为 WorkBuddy skill 使用时的入口 |
+| `references/` | 按需查阅 | profile 填写指南、运作原理、扩展模块写法 |
 | `reviews/` | 新增规则前 | 待审批的经验提取报告，格式见 `reviews/README.md` |
 
 ## 设计原则（改动前先读）
@@ -125,7 +158,7 @@ bash scripts/check.sh
 ## 工具兼容
 
 - `AGENTS.md` 是跨工具事实标准（Codex / Cursor / Jules 等直接读根目录）。
-- Claude Code 只认 `CLAUDE.md`：本仓库已提供，内容是一行 `@AGENTS.md`。复制到新项目时一起带上即可。
+- Claude Code 只认 `CLAUDE.md`：本仓库已提供，内容是一行 `@AGENTS.md`。安装时会一起带上。
 - 有的工具要求小写 `agent.md`：`git mv AGENTS.md agent.md` 或建软链，不要维护两份。
 - 需要目录级规则时，可在子目录放 `AGENTS.md` 补差异，但**不要在子文件里重复根文件的内容**。
 
@@ -134,6 +167,8 @@ bash scripts/check.sh
 加一种语言：复制 `lang-java.md` 的结构（版本 → 类型与空值 → 并发 → 异常 → 日志 → 依赖 → 测试 → 反例），只写这门语言**特有的坑**，通用纪律不要抄。
 
 加一个平台（k8s、Serverless、移动端）：在 `.agents/` 下新增 `release-*.md`，并在 `AGENTS.md` 第 2、3 节的分流表里登记触发条件——不登记就永远不会被加载（`scripts/check.sh` 会拦住这种疏漏）。
+
+详细写法见 [`references/extending.md`](references/extending.md)。
 
 ## 已知边界
 
@@ -150,7 +185,7 @@ bash scripts/check.sh
 | 内部项目 dumpmgr（Spring Boot / Java 21 / 虚拟线程 / Commvault 中间件） | `lang-java.md` 的并发、超时重试、缓存、JSON；`integration.md` 大部分 |
 | 内部项目 i2bb（大数据备份恢复，遗留代码 + AI 全量开发 Kudu 子系统） | `legacy.md` 全部；`integration.md` 的长任务与分布式协作；`discipline.md` 的长任务工程记录 |
 | 公司《代码提交规范 V2.5》（`CodeCommitGuide.md`） | `commit.md` |
-| 开源项目 kudu-crud（Spring Boot / Vue / Docker / Actions） | `release-github.md`、`release-docker.md`、`discipline.md` 的匿名与脱敏 |
+| 开源项目 kudu-console（Spring Boot / Vue / Docker / Actions） | `release-github.md`、`release-docker.md`、`discipline.md` 的匿名与脱敏 |
 | 本仓库自身（首次提交把真实公司邮箱推上了公开仓库） | `templates/githooks/commit-msg`、`scripts/check.sh` 的邮箱检查、`.github/workflows/check.yml` |
 
 `reviews/` 目录放的是**待审批的提取报告**：从项目里挖到经验 → 先出报告 → 审批通过才合并进 `.agents/`。命名格式与合并原则见 `reviews/README.md`。

@@ -35,7 +35,7 @@ section() {
 }
 
 # 所有需要检查的文档
-docs=$(ls AGENTS.md README.md CLAUDE.md .agents/*.md reviews/*.md 2>/dev/null)
+docs=$(ls AGENTS.md README.md CLAUDE.md SKILL.md .agents/*.md reviews/*.md references/*.md 2>/dev/null)
 
 # ---------------------------------------------------------------- 1. 入口行数
 section "1. 入口文件长度"
@@ -92,7 +92,8 @@ for ref in $refs; do
         [ "$ref" = "$e" ] && skip=1
     done
     [ "$skip" = "1" ] && continue
-    if [ ! -e "$ref" ] && [ ! -e ".agents/$ref" ] && [ ! -e "reviews/$ref" ]; then
+    if [ ! -e "$ref" ] && [ ! -e ".agents/$ref" ] && [ ! -e "reviews/$ref" ] &&
+        [ ! -e "references/$ref" ] && [ ! -e "templates/$ref" ]; then
         broken="$broken $ref"
     fi
 done
