@@ -1,6 +1,8 @@
-# agent-kit：通用 AI 开发规范
+# AI 开发规范
 
 一套可复制的规范文件，放进任意新项目根目录即生效。目标是**让 AI 按你的意图开发**，而不是按它的默认习惯。
+
+`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 10 个模块；配套 `commit-msg` 钩子与 CI 自检，把「规范」从文档里的红线变成会失败的提交与流水线。
 
 ## 三步使用
 
@@ -158,8 +160,8 @@ bash scripts/check.sh
 本作品采用 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可协议，可自由复制、修改、商用，需保留署名。全文见 `LICENSE`。
 
 ```
-ai-coding-style by saul, licensed under CC BY 4.0
-https://github.com/999bug/ai-coding-style
+ai-dev-standards by saul, licensed under CC BY 4.0
+https://github.com/999bug/ai-dev-standards
 ```
 
 last-verified: 2026-10-30
