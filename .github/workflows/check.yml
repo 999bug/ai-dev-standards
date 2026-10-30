@@ -1,0 +1,35 @@
+name: check
+
+# 规范仓库自己也要有门禁：README 说过"真正的门禁还是 CI"，
+# 这里把文档自检和历史邮箱检查都跑起来。
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 文档自检
+        run: bash scripts/check.sh
+
+      - name: 提交历史中不含真实邮箱
+        run: |
+          bad=$(git log --format='%ae%n%ce' | sort -u |
+                grep -vE 'noreply\.github\.com|github-actions|^$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::提交历史中包含非匿名邮箱，历史一旦推送就无法撤回："
+            echo "$bad"
+            exit 1
+          fi
+          echo "提交历史中的邮箱均为匿名地址。"
