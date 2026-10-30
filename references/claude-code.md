@@ -21,7 +21,35 @@ CLAUDE.md（1 行）
 
 这正是分层加载要的效果。如果 10 个模块也全展开，上下文会被 1000 多行占满，模型反而只记得住开头——和"一份 400 行万能文件"是同一个问题。
 
-## 使用步骤
+## 方式一：插件市场（推荐）
+
+本仓库同时是一个 Claude Code 插件市场。`.claude-plugin/` 下有 `plugin.json`（插件清单）和 `marketplace.json`（市场清单），skill 在 `skills/ai-dev-standards/`。
+
+```bash
+# 添加市场，再装插件
+claude plugin marketplace add 999bug/ai-dev-standards
+claude plugin install ai-dev-standards@ai-dev-standards
+```
+
+Claude Code v2.1.292+ 可以合并成一条：
+
+```bash
+claude plugin install ai-dev-standards --marketplace 999bug/ai-dev-standards
+```
+
+更新：
+
+```bash
+claude plugin update ai-dev-standards@ai-dev-standards
+```
+
+**发布侧没有提交表单**：把 `marketplace.json` 推进仓库就算发布，谁 clone 到谁就能装。插件清单里的 `version` 决定用户何时收到更新——改了规范就要 bump 它，否则老用户不会自动更新。
+
+如果想进 Anthropic 官方目录（`claude.ai` 和 Cowork 里能搜到），要从 `claude.ai/directory/manage` 提交，需要付费的 claude.ai 计划。官方市场 `claude-plugins-official` 不接受门户提交，只能通过 Anthropic 的合作伙伴渠道谈。
+
+## 方式二：克隆后自己跑安装器
+
+不想装插件的话，直接克隆仓库跑脚本，效果一样——装进项目的是同一批文件。
 
 ```bash
 # 1. 装到项目
@@ -35,6 +63,14 @@ claude
 ```
 
 `--with-hooks` 装的 `commit-msg` 是 git 层面的钩子，Claude Code 里跑 `git commit` 一样会被拦。它和 Claude Code 自己的 hooks（`.claude/settings.json`）是两套东西，互不冲突。
+
+还有一种最直接的方式——把整个插件目录放进用户的 skills 目录，Claude Code 启动时会自动加载：
+
+```bash
+git clone https://github.com/999bug/ai-dev-standards.git ~/.claude/skills/ai-dev-standards
+```
+
+Windows 上是 `C:\Users\<用户名>\.claude\skills\ai-dev-standards`。这种方式不走市场，也不会自动更新，`git pull` 才拿到新版。
 
 ## 验证是否生效
 

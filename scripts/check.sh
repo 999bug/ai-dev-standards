@@ -35,7 +35,7 @@ section() {
 }
 
 # 所有需要检查的文档
-docs=$(ls AGENTS.md README.md CLAUDE.md SKILL.md .agents/*.md reviews/*.md references/*.md 2>/dev/null)
+docs=$(ls AGENTS.md README.md CLAUDE.md SKILL.md .agents/*.md reviews/*.md references/*.md skills/*/SKILL.md 2>/dev/null)
 
 # ---------------------------------------------------------------- 1. 入口行数
 section "1. 入口文件长度"

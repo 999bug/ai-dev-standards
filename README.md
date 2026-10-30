@@ -62,6 +62,25 @@ profile 里如果还有未定项，先列出来问我，不要猜。
 本次只修这个 bug，不顺手重构、不改样式、不升依赖；发现别的问题先报告。
 ```
 
+## 作为 Claude Code 插件安装
+
+本仓库同时是一个 Claude Code 插件市场：`.claude-plugin/` 下有 `plugin.json`（插件清单）和 `marketplace.json`（市场清单），skill 在 `skills/ai-dev-standards/`。
+
+```bash
+claude plugin marketplace add 999bug/ai-dev-standards
+claude plugin install ai-dev-standards@ai-dev-standards
+```
+
+Claude Code v2.1.292+ 可以一条命令装完：
+
+```bash
+claude plugin install ai-dev-standards --marketplace 999bug/ai-dev-standards
+```
+
+装好后在任意项目里说「给这个项目装 AI 开发规范」，skill 会调用安装器。更新用 `claude plugin update ai-dev-standards@ai-dev-standards`。
+
+发布侧没有提交表单：`marketplace.json` 推进仓库即视为发布。详情见 [`references/claude-code.md`](references/claude-code.md)。
+
 ## 作为 WorkBuddy skill 使用
 
 仓库根目录有 `SKILL.md`，所以整个仓库就是一个 skill。安装到本地 skills 目录后，在任意项目里说「给这个项目装 AI 开发规范」即可自动执行：
