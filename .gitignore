@@ -1,0 +1,64 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+.mvn*
+mvnw
+mvnw.cmd
+.gitattributes
+.m2
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+native_wrapper/Lib/libboundscheck/obj
+native_wrapper/Lib/libboundscheck.a
+log
+python/__pycache__/cv_api_client.cpython-314.pyc
+python/__pycache__/cv_config.cpython-314.pyc
+python/__pycache__/cv_dump.cpython-314.pyc
+python/__pycache__/cv_formatters.cpython-314.pyc
+python/__pycache__/cv_jobs.cpython-314.pyc
+python/__pycache__/cv_output.cpython-314.pyc
+python/__pycache__/cv_restore_file.cpython-314.pyc
+python/__pycache__/cv_restore_oracle.cpython-314.pyc
+python/__pycache__/cv_restore.cpython-314.pyc
+python/__pycache__/cv_validators.cpython-314.pyc
+# Understand Anything 分析工具（仅提交 knowledge-graph.json）
+.understand-anything/diff-overlay.json
+.understand-anything/intermediate/
+.understand-anything/tmp/
+.understand-anything/.trash-*/
+.understand-anything/fingerprints.json
+/test.json
+
+# PuTTY tools
+plink.exe
+pscp.exe
+
+.codegraph
