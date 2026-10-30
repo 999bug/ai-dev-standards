@@ -110,7 +110,7 @@ fi
 # ---------------------------------------------------------------- 5. 代码块闭合
 section "5. 代码块闭合"
 unclosed=""
-for f in $docs templates/githooks/* scripts/*.sh; do
+for f in $docs templates/githooks/* hooks/*.sh scripts/*.sh; do
     [ -f "$f" ] || continue
     n=$(grep -c '^```' "$f" 2>/dev/null || true)
     n=${n:-0}

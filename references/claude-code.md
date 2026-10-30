@@ -72,6 +72,64 @@ git clone https://github.com/999bug/ai-dev-standards.git ~/.claude/skills/ai-dev
 
 Windows 上是 `C:\Users\<用户名>\.claude\skills\ai-dev-standards`。这种方式不走市场，也不会自动更新，`git pull` 才拿到新版。
 
+## 插件自带的自动安装
+
+装完插件后，**首次在某个 git 项目里启动会话**，插件会自动把规范装进这个项目——不用再说一句话。
+
+### 原理
+
+插件根目录有 `hooks/hooks.json`，声明了一个 `SessionStart` hook：
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/auto-install.sh\"" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+会话启动时执行 `auto-install.sh`，它按顺序判断：
+
+1. 当前是不是 git 仓库 —— 不是就退出
+2. 有没有 `AGENTS.md` —— 有就退出（幂等，不会每次重写）
+3. 有没有 `.claude/no-ai-dev-standards` —— 有就退出（单项目豁免）
+4. 都通过 → 调 `install.sh` 装一遍，把结果输出到 stdout
+
+stdout 会进入 Claude 的上下文，所以 Claude 会知道刚装了什么、下一步该填 profile。
+
+### 为什么放在插件里而不是用户全局配置
+
+| 方案 | 作用域 | 副作用 |
+| --- | --- | --- |
+| 用户级 `~/.claude/settings.json` 加 hook | 所有项目 | 每个 clone 下来看一眼的开源仓库也会被塞文件 |
+| **插件自带 hook** | **只影响装了插件的项目** | 卸载插件即失效，不留残留 |
+| 手动跑 `install.sh` | 单次 | 每次都要记着跑 |
+
+插件自带的好处是**行为跟着插件走**：你用 local scope 装在某个项目，就只有那个项目会触发；别人装了同一个插件，也得到同样的自动化，不需要各自配置。
+
+### 时序上的一点差别
+
+`claude plugin install` 本身只复制插件目录，**不会执行任何脚本**——Claude Code 没有 post-install 钩子。
+
+所以严格说是「装完之后的第一次会话启动时才装规范」，而不是「install 命令执行完立刻装」。实际体验上没区别：装完插件重启会话，规范就在了。
+
+### 豁免
+
+```bash
+# 单个项目永久豁免（推荐给公司项目、别人的仓库）
+mkdir -p .claude && touch .claude/no-ai-dev-standards
+
+# 单次会话
+AI_DEV_STANDARDS_SKIP=1 claude
+```
+
 ## 验证是否生效
 
 在对话里问：

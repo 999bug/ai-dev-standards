@@ -1,7 +1,7 @@
 {
   "name": "ai-dev-standards",
   "description": "Installs a layered AI development standards kit into a project repository: AGENTS.md entry, .agents/ task modules, commit-msg hook, and CI self-check gate.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "saul",
     "url": "https://github.com/999bug"

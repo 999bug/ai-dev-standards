@@ -79,6 +79,14 @@ claude plugin install ai-dev-standards --marketplace 999bug/ai-dev-standards
 
 装好后在任意项目里说「给这个项目装 AI 开发规范」，skill 会调用安装器。更新用 `claude plugin update ai-dev-standards@ai-dev-standards`。
 
+**插件自带 SessionStart hook**：装好后首次在某个 git 项目里启动会话，如果该项目还没有 `AGENTS.md`，会自动装一遍（幂等，装过就不再动）。不想被自动装的项目放一个豁免标记：
+
+```bash
+mkdir -p .claude && touch .claude/no-ai-dev-standards
+```
+
+单次会话跳过：`AI_DEV_STANDARDS_SKIP=1 claude`。
+
 发布侧没有提交表单：`marketplace.json` 推进仓库即视为发布。详情见 [`references/claude-code.md`](references/claude-code.md)。
 
 ## 作为 WorkBuddy skill 使用
