@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# post-commit：提交完成后同步 CodeGraph 索引。
+#
+# 四个设计要点（缺一个都会咬人）：
+#   1. 只在仓库存在 .codegraph/ 时执行 —— 没建索引的项目零影响
+#   2. 任何失败都只提示、不阻塞 —— 提交已经完成，钩子不得改变 git 的结果
+#   3. 钩子的 PATH 常与 IDE 内不同 —— 用 CODEGRAPH_BIN 兜底（绝对路径或整条命令）
+#   4. 有超时上限 —— 索引卡住不能把 git commit 一起挂在那里
+#
+# 环境变量：
+#   CODEGRAPH_BIN           可执行文件绝对路径，或整条命令，如 `npx -y codegraph`
+#   CODEGRAPH_SYNC_TIMEOUT  超时秒数，默认 120
+#   SKIP_CODEGRAPH_SYNC=1   本次提交临时跳过
+#
+# 安装（在项目根目录执行）：
+#   mkdir -p .githooks
+#   cp <this-repo>/templates/githooks/post-commit .githooks/post-commit
+#   chmod +x .githooks/post-commit
+#   git config core.hooksPath .githooks
+
+if [ "${SKIP_CODEGRAPH_SYNC:-0}" = "1" ]; then
+    exit 0
+fi
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+[ -d "$root/.codegraph" ] || exit 0
+
+codegraph_bin="${CODEGRAPH_BIN:-codegraph}"
+limit="${CODEGRAPH_SYNC_TIMEOUT:-120}"
+
+# 整条命令时只检查第一个词；绝对路径同样能被 command -v 识别
+first_word=${codegraph_bin%% *}
+if ! command -v "$first_word" >/dev/null 2>&1; then
+    echo "[codegraph] 未找到 '$first_word'，跳过索引同步。" >&2
+    echo "[codegraph] 若已安装但 PATH 不同，把 CODEGRAPH_BIN 设为绝对路径或整条命令。" >&2
+    exit 0
+fi
+
+# Git Bash 通常不带 coreutils 的 timeout，所以留一条手写兜底
+run_with_timeout() {
+    _limit=$1
+    shift
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$_limit" "$@"
+    elif command -v gtimeout >/dev/null 2>&1; then
+        gtimeout "$_limit" "$@"
+    else
+        "$@" &
+        _pid=$!
+        ( sleep "$_limit" && kill -9 "$_pid" 2>/dev/null ) &
+        _watch=$!
+        wait "$_pid"
+        _rc=$?
+        kill "$_watch" 2>/dev/null
+        wait "$_watch" 2>/dev/null
+        return $_rc
+    fi
+}
+
+cd "$root" || exit 0
+
+if run_with_timeout "$limit" sh -c "$codegraph_bin sync"; then
+    echo "[codegraph] 索引已同步。"
+else
+    rc=$?
+    echo "[codegraph] 同步失败或超时（退出码 $rc），已忽略，不影响本次提交。" >&2
+    echo "[codegraph] 可手动重试：cd \"$root\" && $codegraph_bin sync" >&2
+fi
+
+exit 0

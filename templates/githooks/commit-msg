@@ -1,0 +1,82 @@
+#!/bin/sh
+#
+# commit-msg：按 .agents/commit.md 校验提交信息格式。
+#
+# 为什么需要它：格式规范写在文档里，靠人自觉执行，第一次提交就会跑偏
+# （真实案例：`[DOC]: init commit` —— 类型大小写错、subject 写不出目的，
+#  而且作者带的是真实公司邮箱，推上去就洗不掉）。这道门禁让跑偏在本地就失败。
+#
+# 安装：
+#   cp templates/githooks/commit-msg .githooks/commit-msg
+#   chmod +x .githooks/commit-msg
+#   git config core.hooksPath .githooks
+#
+# 临时跳过：SKIP_COMMIT_MSG_CHECK=1 git commit ...
+
+[ "${SKIP_COMMIT_MSG_CHECK:-0}" = "1" ] && exit 0
+
+msg_file=$1
+[ -f "$msg_file" ] || exit 0
+
+# 去掉注释行与尾部空行，取有效内容
+msg=$(sed '/^#/d' "$msg_file" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')
+header=$(printf '%s\n' "$msg" | head -1)
+
+# ---------------------------------------------------------------- 放行例外
+case "$header" in
+    "Merge "* | "Revert \""* | "revert: "* | "fixup! "* | "squash! "*)
+        exit 0
+        ;;
+esac
+
+# ---------------------------------------------------------------- 读取风格
+style=company
+if [ -f .agents/project-profile.md ]; then
+    s=$(grep -E '^commit_style:' .agents/project-profile.md 2>/dev/null |
+        head -1 | sed 's/#.*//' | awk '{print $2}')
+    [ -n "${s:-}" ] && style=$s
+fi
+
+fail() {
+    printf '\n[commit-msg] %s\n' "$1" >&2
+    shift
+    for line in "$@"; do printf '%s\n' "$line" >&2; done
+    printf '\n  参考 .agents/commit.md。确需跳过：SKIP_COMMIT_MSG_CHECK=1 git commit ...\n\n' >&2
+    exit 1
+}
+
+# ---------------------------------------------------------------- 格式校验
+if [ "$style" = "conventional" ]; then
+    # feat: xxx / fix(scope): xxx
+    printf '%s' "$header" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?: .+' ||
+        fail "提交信息不符合 conventional commits 格式。" \
+            "  期望：feat: 一句话说明目的" \
+            "  实际：$header"
+else
+    # [Type]: xxx / [Type][scope]: xxx
+    printf '%s' "$header" | grep -qE '^\[(NF|BF|IM|SC|CU|RF|Doc|OT|Tag)\](\[[^]]+\])?: .+' ||
+        fail "提交信息不符合 [Type] 格式。" \
+            "  期望：[BF] 修复比对列顺序导致误报" \
+            "        [IM][compare]: 比对改为按列名配对" \
+            "  类型：NF BF IM SC CU RF Doc OT Tag（大小写敏感，写 Doc 不是 DOC）" \
+            "  实际：$header"
+
+    # subject 不能是"写不出目的"的单词
+    subject=$(printf '%s' "$header" | sed -E 's/^\[[^]]+\](\[[^]]+\])?: *//')
+    case "$subject" in
+        "" | update | Update | UPDATE | fix | Fix | FIX | modify | Modify | change | Change | \
+            修改 | 更新 | 提交 | 改动 | 优化)
+            fail "subject 写不出目的：'$subject'" \
+                "  commit.md 第 1 节：【红线】message 不能只写 Fix / update 这类单词。"
+            ;;
+    esac
+fi
+
+# ---------------------------------------------------------------- 署名校验
+if printf '%s' "$msg" | grep -qE 'Generated with|Generated-by|Co-Authored-By:.*(Claude|GPT|Copilot|AI|Bot)|Co-authored-by: (AI|ai)'; then
+    fail "提交信息里出现 AI 署名。" \
+        "  commit.md 第 1 节：【红线】body 中不得出现 Co-Authored-By: Claude / Generated with 之类的内容。" \
+        "  提交记录只能指向人。"
+fi
+
+exit 0
