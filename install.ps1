@@ -185,15 +185,27 @@ else {
                     New-Item -ItemType Directory -Path $hookDir -Force | Out-Null
                 }
 
-                # 钩子必须覆盖才生效，但已有的先备份
+                # 已有钩子分三种情况处理，不静默停用用户的东西
                 if (Test-Path $dst) {
-                    $backup = "$dst.bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
-                    try {
-                        Copy-Item -Path $dst -Destination $backup -Force
-                        Write-Host "  已有 $h，已备份为 $(Split-Path -Leaf $backup)"
+                    $content = ''
+                    try { $content = Get-Content -Path $dst -Raw -ErrorAction SilentlyContinue } catch { $content = '' }
+                    $isOurs = $content -and ($content -match 'ai-dev-standards-hook')
+                    $localCopy = "$dst.local"
+
+                    if ($isOurs) {
+                        Write-Host "  更新已有的 $h（旧版规范钩子）"
                     }
-                    catch {
-                        Write-Host "  ! 已有 $h，备份失败，仍继续覆盖"
+                    elseif (Test-Path $localCopy) {
+                        Write-Host "  已有 $h，原钩子保留在 $h.local，未重复备份"
+                    }
+                    else {
+                        try {
+                            Copy-Item -Path $dst -Destination $localCopy -Force
+                            Write-Host "  已有自定义 $h，保留为 $h.local（规范钩子会接着执行它）"
+                        }
+                        catch {
+                            Write-Host "  ! 已有 $h，无法保留原钩子，仍继续覆盖"
+                        }
                     }
                 }
 

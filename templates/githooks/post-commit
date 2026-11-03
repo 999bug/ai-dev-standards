@@ -1,4 +1,5 @@
 #!/bin/sh
+# ai-dev-standards-hook
 #
 # post-commit：提交完成后同步 CodeGraph 索引。
 #
@@ -19,6 +20,12 @@
 #
 # 注意：如果项目设过 core.hooksPath，git 会忽略 .git/hooks/，
 # 需要先 git config --unset core.hooksPath。
+
+# 先跑用户原有的钩子（安装器会把它保留为 post-commit.local）。
+# 必须放在所有提前退出之前——否则本项目没建索引时，你原来的钩子会被一起跳过。
+if [ -f "$0.local" ]; then
+    sh "$0.local" "$@" || true
+fi
 
 if [ "${SKIP_CODEGRAPH_SYNC:-0}" = "1" ]; then
     exit 0

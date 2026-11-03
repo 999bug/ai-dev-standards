@@ -132,7 +132,15 @@ git config --unset core.hooksPath
 
 不想要钩子：重装时加 `--no-hooks`，或直接删掉 `.git/hooks/commit-msg` 和 `.git/hooks/post-commit`。
 
-已有同名钩子不会被静默丢掉——安装器会先备份成 `commit-msg.bak.<时间戳>` 再覆盖。
+已有同名钩子不会被停用。安装器把它保留成 `commit-msg.local`，规范钩子校验通过后会接着执行它——你原来的逻辑照旧生效，两边的门禁是叠加的，不是替换。
+
+想确认发生了什么：
+
+```bash
+ls .git/hooks/ | grep -E 'commit-msg|post-commit'
+# commit-msg          ← 规范的校验
+# commit-msg.local    ← 你原来的钩子，会被自动调用
+```
 
 临时跳过：
 

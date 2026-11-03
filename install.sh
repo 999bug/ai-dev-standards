@@ -196,13 +196,19 @@ else
 
                 mkdir -p "$hook_dir"
 
-                # 钩子必须覆盖才生效，但已有的先备份，不静默丢用户的钩子
+                # 已有钩子分三种情况处理，不静默停用用户的东西
                 if [ -f "$dst" ]; then
-                    backup="$dst.bak.$(date +%Y%m%d%H%M%S)"
-                    if cp "$dst" "$backup" 2>/dev/null; then
-                        log "  已有 $h，已备份为 $(basename "$backup")"
+                    if grep -q 'ai-dev-standards-hook' "$dst" 2>/dev/null; then
+                        log "  更新已有的 $h（旧版规范钩子）"
+                    elif [ -f "$dst.local" ]; then
+                        log "  已有 $h，原钩子保留在 $(basename "$dst").local，未重复备份"
                     else
-                        log "  ! 已有 $h，备份失败，仍继续覆盖"
+                        # 用户自定义钩子：改名成 .local，由我们的钩子链式调用
+                        if cp "$dst" "$dst.local" 2>/dev/null; then
+                            log "  已有自定义 $h，保留为 $(basename "$dst").local（规范钩子会接着执行它）"
+                        else
+                            log "  ! 已有 $h，无法保留原钩子，仍继续覆盖"
+                        fi
                     fi
                 fi
 

@@ -1,4 +1,5 @@
 #!/bin/sh
+# ai-dev-standards-hook
 #
 # commit-msg：按 .agents/commit.md 校验提交信息格式。
 #
@@ -79,6 +80,15 @@ if printf '%s' "$msg" | grep -qE 'Generated with|Generated-by|Co-Authored-By:.*(
     fail "提交信息里出现 AI 署名。" \
         "  commit.md 第 1 节：【红线】body 中不得出现 Co-Authored-By: Claude / Generated with 之类的内容。" \
         "  提交记录只能指向人。"
+fi
+
+# ---------------------------------------------------------------- 链式调用
+# 安装器发现这里原本已有自定义钩子时，会把它保留成 commit-msg.local 而不是删掉。
+# 我们的校验通过后接着跑它，避免"装规范"等于"停用你原来的钩子"。
+_local="$0.local"
+if [ -f "$_local" ]; then
+    sh "$_local" "$@"
+    exit $?
 fi
 
 exit 0
