@@ -65,7 +65,7 @@ chmod +x install.sh
 
 | 选项（sh / ps1） | 装什么 | 项目根新增 |
 | --- | --- | --- |
-| 默认 | 入口 + 10 个模块 + `CLAUDE.md`，并把钩子装进 `.git/hooks/` | 3 个 |
+| 默认 | 入口 + 11 个模块 + `CLAUDE.md`，并把钩子装进 `.git/hooks/` | 3 个 |
 | `--no-hooks` / `-NoHooks` | 同上，但不装钩子 | 3 个 |
 | `--with-check` / `-WithCheck` | 再加 `scripts/check.sh`（五项自检） | 4 个 |
 | `--with-ci` / `-WithCi` | 再加 `.github/workflows/check.yml`；会自动带上 `check.sh` | 5 个 |

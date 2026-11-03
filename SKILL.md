@@ -8,7 +8,7 @@ agent_created: true
 
 ## 用途
 
-把一个可复制的分层规范体系装进任意项目：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 10 个模块，配套 `commit-msg` 钩子与 CI 自检，把「规范」从文档里的红线变成会失败的提交与流水线。
+把一个可复制的分层规范体系装进任意项目：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 11 个模块，配套 `commit-msg` 钩子与 CI 自检，把「规范」从文档里的红线变成会失败的提交与流水线。
 
 规范化必须落地到项目根目录，才能被 Codex / Cursor / Claude Code 等工具读到——只在对话里讲规则是没用的。
 
@@ -37,7 +37,7 @@ Windows：
 
 | 选项 | 作用 |
 | --- | --- |
-| （无） | `AGENTS.md` + `CLAUDE.md` + `.agents/` 10 个模块，并把 git 钩子装进 `.git/hooks/` |
+| （无） | `AGENTS.md` + `CLAUDE.md` + `.agents/` 11 个模块，并把 git 钩子装进 `.git/hooks/` |
 | `--with-check` | 加 `scripts/check.sh`（五项自检） |
 | `--with-ci` | 加 `.github/workflows/check.yml`，会自动带上 `check.sh` |
 | `--no-hooks` | 不装 git 钩子（默认是装的） |
@@ -100,9 +100,9 @@ bash scripts/check.sh
 ai-dev-standards/
 ├── AGENTS.md                    入口（装到项目的根目录）
 ├── CLAUDE.md                    Claude Code 的兼容入口
-├── .agents/                     10 个按任务加载的模块
+├── .agents/                     11 个按任务加载的模块
 │   ├── project-profile.md       项目事实（每个项目唯一要改的文件）
-│   ├── commit.md · discipline.md · integration.md · legacy.md
+│   ├── commit.md · discipline.md · integration.md · legacy.md · task-workflow.md
 │   └── lang-{java,python,vue}.md · release-{github,docker}.md
 ├── scripts/check.sh             五项自检
 ├── templates/

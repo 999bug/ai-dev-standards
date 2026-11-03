@@ -87,7 +87,8 @@ section "4. 交叉引用的文件存在"
 #   LOCAL-ONLY.md       本地私有记录，按约定永不入库
 #   CLAUDE.local.md     Claude Code 的个人偏好文件，按约定不入库
 #   agent.md            部分工具要求的小写入口，由使用者自行改名产生
-external="CodeCommitGuide.md LOCAL-ONLY.md CLAUDE.local.md agent.md"
+#   docs/PROGRESS.md    任务台账，由 task-workflow.md 指导装到目标项目里
+external="CodeCommitGuide.md LOCAL-ONLY.md CLAUDE.local.md agent.md docs/PROGRESS.md"
 broken=""
 refs=$(grep -ohE '`[A-Za-z0-9_./-]+\.md`' $docs 2>/dev/null | tr -d '`' | sort -u)
 for ref in $refs; do

@@ -1,6 +1,6 @@
 # AI 开发规范
 
-装进项目就能生效的一套分层开发规范：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 10 个模块，可选提交门禁与 CI 自检。目标是让 AI 按你的意图改代码，而不是按它的默认习惯。
+装进项目就能生效的一套分层开发规范：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 11 个模块，可选提交门禁与 CI 自检。目标是让 AI 按你的意图改代码，而不是按它的默认习惯。
 
 装完一个项目只多 3 个条目：`AGENTS.md`、`.agents/`、`CLAUDE.md`。钩子进 `.git/hooks/`，不占根目录。
 
@@ -21,7 +21,7 @@ claude plugin install ai-dev-standards@ai-dev-standards --scope local
 
 ```text
 [ai-dev-standards] 本项目还没有 AI 开发规范，已自动安装。
-  写入 14 个文件，跳过 0 个已存在的文件
+  写入 15 个文件，跳过 0 个已存在的文件
 ```
 
 自动安装走**默认级别**：规范文件 + git 钩子。钩子进 `.git/hooks/`，不占项目根目录条目。不写 CI——往 `.github/` 里加文件应该由你主动决定，需要时重跑安装器加 `--with-ci`。
@@ -117,6 +117,7 @@ bash scripts/check.sh
 | `.agents/discipline.md` | 提交、碰凭据、收尾 | Git 红线、匿名与脱敏、自测闭环、多会话并行 |
 | `.agents/integration.md` | 对接外部系统、调 SDK | HTTP 200 陷阱、签名与编码、时间戳单位、断线缓冲 |
 | `.agents/legacy.md` | 接手老项目、重构巨型类 | 体检 grep、找接缝、迁移只搬不改、验收清单 |
+| `.agents/task-workflow.md` | 跨多次会话、要拆子任务、接手半成品 | 何时写 spec/plan、模板、台账与交接、子代理任务书与报告 |
 | `.agents/lang-*.md` | 改对应语言时 | Java / Python / Vue 各自的坑，通用纪律不重复 |
 | `.agents/release-*.md` | 发版、改镜像 | GitHub Actions 与 Docker 的发布、回滚 |
 | `CLAUDE.md` | Claude Code 会话 | 一行 `@AGENTS.md`，让只认 CLAUDE.md 的工具读到同一份规范 |
