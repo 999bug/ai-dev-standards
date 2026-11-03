@@ -57,6 +57,8 @@ claude plugin marketplace remove ai-dev-standards
 
 优先补这四个：`build_command`、`test_command`、`git_user_email`（开源项目一律匿名）、`push_policy`。字段说明与常见错误见 [`references/profile-guide.md`](references/profile-guide.md)。
 
+项目里已经有 `CLAUDE.md` / `AGENTS.md`（`/init` 产物）时，可以让 AI 按指南里的「自动生成」映射表直接产出初稿，再逐项确认——比从空白模板手填快得多；正文抽取进模板 §10「项目详细档案」。
+
 ### 2. 每开一次会话，先说一句
 
 ```text
@@ -112,7 +114,7 @@ bash scripts/check.sh
 | 文件 | 什么时候读 | 内容 |
 | --- | --- | --- |
 | `AGENTS.md` | 每次会话 | 优先级、工作方式、自动探测、分流表、10 条跨语言红线、完成定义 |
-| `.agents/project-profile.md` | 每次会话 | 项目事实，唯一必改的文件 |
+| `.agents/project-profile.md` | 每次会话 | 项目事实，唯一必改的文件；已有 `/init` 产物时可自动生成初稿 |
 | `.agents/commit.md` | 写 commit、定分支、打 tag | 类型与单号、三段式格式、粒度禁令、分支与 Tag |
 | `.agents/discipline.md` | 提交、碰凭据、收尾 | Git 红线、匿名与脱敏、自测闭环、多会话并行 |
 | `.agents/integration.md` | 对接外部系统、调 SDK | HTTP 200 陷阱、签名与编码、时间戳单位、断线缓冲 |

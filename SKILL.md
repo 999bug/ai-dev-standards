@@ -53,6 +53,8 @@ Windows：
 
 **这是整套体系能否生效的关键。** 一份没填完的 profile 比没有 profile 更危险：AI 会拿示例值当事实，用"看起来合理"的默认值代替项目实际情况，然后一路错下去。
 
+项目里已有 `CLAUDE.md` / `AGENTS.md`（`/init` 产物）时，先按 [`references/profile-guide.md`](references/profile-guide.md) 的「自动生成」映射表产出初稿（正文抽取进模板 §10），再逐项确认。
+
 填的时候：
 
 1. 从项目里读事实，不要问已知的东西——`pom.xml` 的 `java.version`、`package.json` 的依赖、`.github/workflows/` 的触发方式
