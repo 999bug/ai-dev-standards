@@ -11,15 +11,18 @@
     目标项目目录，默认当前目录。
 
 .PARAMETER Minimal
-    只装 AGENTS.md + .agents/，项目根只多 2 个条目。
+    只装 AGENTS.md + .agents/，项目根只多 2 个条目，不装钩子。
     适合不用 Claude Code 的场景——它不装 CLAUDE.md，Claude Code 会读不到规范。
-    与 -WithHooks / -WithCi 互斥。
+    与 -NoHooks / -WithCi 互斥。
+
+.PARAMETER NoHooks
+    不装 git 钩子。钩子默认是装的，装到 .git/hooks/。
 
 .PARAMETER WithCi
     同时安装 .github/workflows/check.yml。
 
 .PARAMETER WithHooks
-    安装 git 钩子并设置 core.hooksPath。
+    兼容旧写法保留；钩子现在是默认行为，不需要显式指定。
 
 .PARAMETER Force
     覆盖已存在的文件。
@@ -40,6 +43,7 @@
 param(
     [string]$Target = '.',
     [switch]$Minimal,
+    [switch]$NoHooks,
     [switch]$WithCi,
     [switch]$WithHooks,
     [switch]$Force,
@@ -51,8 +55,8 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = $PSScriptRoot
 
-if ($Minimal -and ($WithCi -or $WithHooks)) {
-    throw '-Minimal 与 -WithHooks / -WithCi 互斥。要么只装核心，要么去掉 -Minimal 装完整版。'
+if ($Minimal -and ($WithCi -or $NoHooks)) {
+    throw '-Minimal 与 -WithCi / -NoHooks 互斥。-Minimal 本身就是只装核心，不需要再叠加这些开关。'
 }
 
 if (-not (Test-Path (Join-Path $repoRoot 'AGENTS.md')) -or
@@ -127,27 +131,65 @@ else {
         Write-File (Join-Path $repoRoot 'templates/github/check.yml') (Join-Path $target '.github/workflows/check.yml')
     }
 
-    if ($WithHooks) {
-        Write-Host '5. git 钩子'
-        Write-File (Join-Path $repoRoot 'templates/githooks/commit-msg') (Join-Path $target 'templates/githooks/commit-msg')
-        Write-File (Join-Path $repoRoot 'templates/githooks/post-commit') (Join-Path $target 'templates/githooks/post-commit')
+    if (-not $NoHooks) {
+        Write-Host '4. git 钩子'
 
-        if (-not $DryRun) {
-            $isRepo = $false
-            try {
-                & git -C $target rev-parse --git-dir *> $null
-                $isRepo = ($LASTEXITCODE -eq 0)
-            }
-            catch { $isRepo = $false }
+        $gitDir = $null
+        try {
+            $candidate = & git -C $target rev-parse --absolute-git-dir 2>$null
+            if ($LASTEXITCODE -eq 0 -and $candidate) { $gitDir = $candidate.Trim() }
+        }
+        catch { $gitDir = $null }
 
-            if ($isRepo) {
-                & git -C $target config core.hooksPath templates/githooks
-                Write-Host '  core.hooksPath -> templates/githooks'
+        if (-not $gitDir) {
+            Write-Host '  ! 目标不是 git 仓库，跳过钩子安装（装到 .git/hooks/ 需要仓库）'
+        }
+        else {
+            $hookDir = Join-Path $gitDir 'hooks'
+
+            # core.hooksPath 一旦设置，git 就完全不看 .git/hooks/ 了
+            $configured = $null
+            try { $configured = & git -C $target config core.hooksPath 2>$null } catch { $configured = $null }
+            if ($configured) {
+                Write-Host "  ! 该项目已配置 core.hooksPath=$configured"
+                Write-Host '    git 会忽略 .git/hooks/，刚装的钩子不会生效。'
+                Write-Host '    用之前先执行：git config --unset core.hooksPath'
             }
-            else {
-                Write-Host '  ! 目标不是 git 仓库，跳过 hooksPath 配置'
+
+            foreach ($h in @('commit-msg', 'post-commit')) {
+                $src = Join-Path $repoRoot "templates/githooks/$h"
+                $dst = Join-Path $hookDir $h
+                if (-not (Test-Path $src)) { continue }
+
+                if ($DryRun) {
+                    Write-Host "  [预览] .git/hooks/$h"
+                    $script:copied++
+                    continue
+                }
+
+                if (-not (Test-Path $hookDir)) {
+                    New-Item -ItemType Directory -Path $hookDir -Force | Out-Null
+                }
+
+                # 钩子必须覆盖才生效，但已有的先备份
+                if (Test-Path $dst) {
+                    $backup = "$dst.bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
+                    try {
+                        Copy-Item -Path $dst -Destination $backup -Force
+                        Write-Host "  已有 $h，已备份为 $(Split-Path -Leaf $backup)"
+                    }
+                    catch {
+                        Write-Host "  ! 已有 $h，备份失败，仍继续覆盖"
+                    }
+                }
+
+                Copy-Item -Path $src -Destination $dst -Force
+                $script:copied++
             }
         }
+    }
+    else {
+        Write-Host '4. 已跳过钩子（-NoHooks）'
     }
 }
 

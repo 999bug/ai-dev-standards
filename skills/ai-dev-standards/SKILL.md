@@ -28,7 +28,7 @@ Read <插件根>/SKILL.md
 3. **正式安装**：
 
    ```bash
-   bash <插件根>/install.sh <目标目录> --with-hooks --with-ci
+   bash <插件根>/install.sh <目标目录> --with-ci
    ```
 
    默认不覆盖已存在的文件，装过一次后再跑是幂等的。
@@ -47,7 +47,7 @@ Read <插件根>/SKILL.md
 | `CLAUDE.md` | 项目根（一行 `@AGENTS.md`，给 Claude Code 用） |
 | `.agents/*.md` | 项目的 `.agents/` |
 | `scripts/check.sh` | 项目的 `scripts/` |
-| `templates/githooks/commit-msg` `post-commit` | 项目的 `templates/githooks/`（`--with-hooks`） |
+| `templates/githooks/commit-msg` `post-commit` | 项目的 `.git/hooks/`（默认就装） |
 | `templates/github/check.yml` | 项目的 `.github/workflows/`（`--with-ci`） |
 
 ## 安装后提醒用户

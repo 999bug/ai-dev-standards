@@ -49,7 +49,7 @@ git clone https://github.com/999bug/ai-dev-standards.git <项目>/.workbuddy/ski
 ```bash
 git clone https://github.com/999bug/ai-dev-standards.git
 cd ai-dev-standards
-./install.sh /path/to/your-project --with-hooks --with-ci
+./install.sh /path/to/your-project --with-ci
 ```
 
 WorkBuddy 会把项目根的 `AGENTS.md` 作为项目规范读进上下文，不需要额外入口文件。

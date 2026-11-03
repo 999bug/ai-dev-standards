@@ -13,11 +13,12 @@
 #   CODEGRAPH_SYNC_TIMEOUT  超时秒数，默认 120
 #   SKIP_CODEGRAPH_SYNC=1   本次提交临时跳过
 #
-# 安装（在项目根目录执行）：
-#   mkdir -p .githooks
-#   cp <this-repo>/templates/githooks/post-commit .githooks/post-commit
-#   chmod +x .githooks/post-commit
-#   git config core.hooksPath .githooks
+# 安装（install.sh 默认就会做，通常不用手动）：
+#   cp templates/githooks/post-commit .git/hooks/post-commit
+#   chmod +x .git/hooks/post-commit
+#
+# 注意：如果项目设过 core.hooksPath，git 会忽略 .git/hooks/，
+# 需要先 git config --unset core.hooksPath。
 
 if [ "${SKIP_CODEGRAPH_SYNC:-0}" = "1" ]; then
     exit 0

@@ -42,31 +42,39 @@ chmod +x install.sh
 ## 3. 正式安装
 
 ```bash
-# 默认：AGENTS.md + CLAUDE.md + .agents/ + scripts/check.sh（项目根多 4 个条目）
+# 默认：AGENTS.md + CLAUDE.md + .agents/ + scripts/check.sh
+#       外加 .git/hooks/ 下的两个钩子（钩子不占项目根目录条目）
 ./install.sh /path/to/your-project
 
-# 推荐：再加提交门禁与 CI
-./install.sh /path/to/your-project --with-hooks --with-ci
+# 再加 CI 门禁
+./install.sh /path/to/your-project --with-ci
+
+# 只要规范核心，不要钩子
+./install.sh /path/to/your-project --minimal
 ```
 
 ```powershell
 # Windows 等价写法
-.\install.ps1 -Target F:\code\my-project -WithHooks -WithCi
+.\install.ps1 -Target F:\code\my-project
+.\install.ps1 -Target F:\code\my-project -WithCi
+.\install.ps1 -Target F:\code\my-project -Minimal
 ```
 
 | 选项（sh / ps1） | 装什么 | 项目根新增 |
 | --- | --- | --- |
-| 默认 | 入口 + 10 个模块 + `CLAUDE.md` + 自检脚本 | 4 个 |
-| `--with-hooks` / `-WithHooks` | 再加 git 钩子，并设好 `core.hooksPath` | 5 个 |
-| `--with-ci` / `-WithCi` | 再加 `.github/workflows/check.yml` | 6 个 |
-| `--minimal` / `-Minimal` | 只装 `AGENTS.md` + `.agents/` | 2 个 |
+| 默认 | 入口 + 10 个模块 + `CLAUDE.md` + 自检脚本，并把钩子装进 `.git/hooks/` | 4 个 |
+| `--no-hooks` / `-NoHooks` | 同上，但不装钩子 | 4 个 |
+| `--with-ci` / `-WithCi` | 再加 `.github/workflows/check.yml` | 5 个 |
+| `--minimal` / `-Minimal` | 只装 `AGENTS.md` + `.agents/`，也不装钩子 | 2 个 |
 | `--force` / `-Force` | 覆盖已存在文件 | — |
 | `--dry-run` / `-DryRun` | 只预览，不落盘 | — |
 
+**钩子默认就装**，位置是 `.git/hooks/`，不占项目根目录、也不需要配 `core.hooksPath`。代价是它不进版本控制，别人 clone 后要各自装一次。
+
 两条约束：
 
-- `--minimal` 与 `--with-hooks` / `--with-ci` 互斥。它也不装 `CLAUDE.md`，Claude Code 会读不到规范，只适合完全不用 Claude Code 的场景。
-- **默认不覆盖已存在的文件**。装过一次再跑是幂等的（写入 0，全部跳过）。目标项目可能已经改过某个模块，要覆盖必须显式加 `--force`，先确认清楚。
+- `--minimal` 与 `--no-hooks` / `--with-ci` 互斥。它也不装 `CLAUDE.md`，Claude Code 会读不到规范，只适合完全不用 Claude Code 的场景。
+- **默认不覆盖已存在的文件**。装过一次再跑是幂等的（写入 0，全部跳过）。目标项目可能已经改过某个模块，要覆盖必须显式加 `--force`，先确认清楚。钩子是例外——装了才生效，所以已有同名钩子会先备份再覆盖。
 
 ## 4. 确认装了什么
 
@@ -96,17 +104,29 @@ Windows 上跑 `check.sh` 需要 Git Bash；也可以直接用项目里的 CI �
 
 原有内容一行不用动。注意别在新项目里跑 `/init`，它会把这一行冲掉。
 
-## 6. 补装 git 钩子
+## 6. git 钩子
 
-默认级别没装钩子的话，重跑一次即可（不会覆盖已有文件）：
+默认就装了，位置是 `.git/hooks/`：
 
 ```bash
-./install.sh /path/to/your-project --with-hooks
+ls -l .git/hooks/commit-msg .git/hooks/post-commit
 ```
 
-插件方式安装的，不用去翻 `~/.claude/plugins/cache/` 里的版本目录：克隆一份仓库，用上面的命令跑就行，它只会补缺失的文件。
+两个钩子的作用：
 
-钩子的作用是：`commit-msg` 按 `.agents/commit.md` 校验提交信息，格式不对直接拒绝；`post-commit` 在项目有 `.codegraph/` 时提交后同步索引，失败或超时只提示、不阻塞提交。
+- `commit-msg`：按 `.agents/commit.md` 校验提交信息，格式不对直接拒绝
+- `post-commit`：项目有 `.codegraph/` 时提交后同步索引，失败或超时只提示、不阻塞提交
+
+**注意 `core.hooksPath`**：项目之前设过这个值的话，git 会完全忽略 `.git/hooks/`，钩子装了也不生效。检查并清掉：
+
+```bash
+git config --get core.hooksPath     # 有输出说明设过
+git config --unset core.hooksPath
+```
+
+不想要钩子：重装时加 `--no-hooks`，或直接删掉 `.git/hooks/commit-msg` 和 `.git/hooks/post-commit`。
+
+已有同名钩子不会被静默丢掉——安装器会先备份成 `commit-msg.bak.<时间戳>` 再覆盖。
 
 临时跳过：
 
@@ -149,8 +169,8 @@ rm -rf .agents
 rm -f AGENTS.md scripts/check.sh
 rmdir scripts 2>/dev/null || true
 
-# 钩子（装过 --with-hooks 才有）
-git config --unset core.hooksPath
+# 钩子（默认就装，不想要就删）
+rm -f .git/hooks/commit-msg .git/hooks/post-commit
 
 # CI（装过 --with-ci 才有）
 rm -f .github/workflows/check.yml
@@ -163,7 +183,7 @@ Windows PowerShell：
 ```powershell
 Remove-Item -Recurse -Force .agents -ErrorAction SilentlyContinue
 Remove-Item -Force AGENTS.md, scripts\check.sh -ErrorAction SilentlyContinue
-git config --unset core.hooksPath
+Remove-Item -Force .git\hooks\commit-msg, .git\hooks\post-commit -ErrorAction SilentlyContinue
 Remove-Item -Force .github\workflows\check.yml -ErrorAction SilentlyContinue
 ```
 
@@ -172,8 +192,9 @@ Remove-Item -Force .github\workflows\check.yml -ErrorAction SilentlyContinue
 | 现象 | 原因与处理 |
 | --- | --- |
 | `Permission denied` | 没执行权限，`chmod +x install.sh` |
-| `未知选项: --with-hooks` | 在 PowerShell 里跑了 sh 参数。换成 `-WithHooks` |
-| 提示目标不是 git 仓库 | 文件照装，`core.hooksPath` 跳过；需要钩子就先 `git init` |
+| `未知选项: --with-ci` | 在 PowerShell 里跑了 sh 参数。换成 `-WithCi` |
+| 提示目标不是 git 仓库 | 文件照装，钩子跳过（`.git/hooks/` 需要仓库）；要钩子就先 `git init` |
+| 钩子装了但不生效 | 项目设过 `core.hooksPath`，git 会忽略 `.git/hooks/`。`git config --unset core.hooksPath` |
 | 输出「写入 0 个文件」 | 已经装过，这是幂等行为。要更新加 `--force`，先预览 |
 | `check.sh` 报引用了不存在的文件 | 文档里写了不存在的 `.md`。改文件名或删引用，别加白名单绕 |
 | `check.sh` 报模块没登记 | 新增了 `.agents/*.md`，但没在 `AGENTS.md` 分流表登记 |

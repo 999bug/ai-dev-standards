@@ -6,10 +6,12 @@
 # （真实案例：`[DOC]: init commit` —— 类型大小写错、subject 写不出目的，
 #  而且作者带的是真实公司邮箱，推上去就洗不掉）。这道门禁让跑偏在本地就失败。
 #
-# 安装：
-#   cp templates/githooks/commit-msg .githooks/commit-msg
-#   chmod +x .githooks/commit-msg
-#   git config core.hooksPath .githooks
+# 安装（install.sh 默认就会做，通常不用手动）：
+#   cp templates/githooks/commit-msg .git/hooks/commit-msg
+#   chmod +x .git/hooks/commit-msg
+#
+# 注意：如果项目设过 core.hooksPath，git 会忽略 .git/hooks/，
+# 需要先 git config --unset core.hooksPath。
 #
 # 临时跳过：SKIP_COMMIT_MSG_CHECK=1 git commit ...
 

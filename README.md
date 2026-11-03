@@ -21,10 +21,10 @@ claude plugin install ai-dev-standards@ai-dev-standards --scope local
 
 ```text
 [ai-dev-standards] 本项目还没有 AI 开发规范，已自动安装。
-  写入 13 个文件，跳过 0 个已存在的文件
+  写入 15 个文件，跳过 0 个已存在的文件
 ```
 
-自动安装走**默认级别**：不装 git 钩子、不写 CI。这两样会改变提交行为、往 `.github/` 里加文件，应该由你主动选择，需要时重跑安装器加 `--with-hooks --with-ci`。
+自动安装走**默认级别**：规范文件 + git 钩子。钩子进 `.git/hooks/`，不占项目根目录条目。不写 CI——往 `.github/` 里加文件应该由你主动决定，需要时重跑安装器加 `--with-ci`。
 
 ### 官方插件装不上
 
@@ -113,7 +113,7 @@ bash scripts/check.sh
 | `.agents/release-*.md` | 发版、改镜像 | GitHub Actions 与 Docker 的发布、回滚 |
 | `CLAUDE.md` | Claude Code 会话 | 一行 `@AGENTS.md`，让只认 CLAUDE.md 的工具读到同一份规范 |
 | `scripts/check.sh` | 本地或 CI | 五项自检，见上 |
-| `templates/githooks/` | 提交时 | 校验提交信息；有 `.codegraph/` 时提交后同步索引 |
+| `.git/hooks/`（装进去的） | 提交时 | `commit-msg` 校验提交信息；`post-commit` 在有 `.codegraph/` 时同步索引 |
 | `templates/github/check.yml` | 目标项目的 CI | 自检 + 历史邮箱扫描 |
 
 `install.sh` / `install.ps1` 负责把这些装到目标项目，默认不覆盖已有文件。运作原理见 [`references/how-it-works.md`](references/how-it-works.md)，扩展写法见 [`references/extending.md`](references/extending.md)。

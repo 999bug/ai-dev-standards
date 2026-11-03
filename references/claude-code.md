@@ -55,14 +55,14 @@ claude plugin update ai-dev-standards@ai-dev-standards
 # 1. 装到项目
 git clone https://github.com/999bug/ai-dev-standards.git
 cd ai-dev-standards
-./install.sh /path/to/your-project --with-hooks
+./install.sh /path/to/your-project
 
 # 2. 在项目里启动 Claude Code
 cd /path/to/your-project
 claude
 ```
 
-`--with-hooks` 装的 `commit-msg` 是 git 层面的钩子，Claude Code 里跑 `git commit` 一样会被拦。它和 Claude Code 自己的 hooks（`.claude/settings.json`）是两套东西，互不冲突。
+装进 `.git/hooks/` 的 `commit-msg` 是 git 层面的钩子，Claude Code 里跑 `git commit` 一样会被拦。它和 Claude Code 自己的 hooks（`.claude/settings.json`）是两套东西，互不冲突。
 
 还有一种最直接的方式——把整个插件目录放进用户的 skills 目录，Claude Code 启动时会自动加载：
 

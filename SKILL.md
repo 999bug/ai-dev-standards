@@ -25,21 +25,22 @@ git clone https://github.com/999bug/ai-dev-standards.git
 ```bash
 cd ai-dev-standards
 ./install.sh /path/to/your-project --dry-run          # 先预览
-./install.sh /path/to/your-project --with-hooks --with-ci
+./install.sh /path/to/your-project --with-ci
 ```
 
 Windows：
 
 ```powershell
 .\install.ps1 -Target F:\code\my-project -DryRun
-.\install.ps1 -Target F:\code\my-project -WithHooks -WithCi
+.\install.ps1 -Target F:\code\my-project -WithCi
 ```
 
 | 选项 | 作用 |
 | --- | --- |
-| （无） | `AGENTS.md` + `CLAUDE.md` + `.agents/` 10 个模块 + `scripts/check.sh` |
+| （无） | `AGENTS.md` + `CLAUDE.md` + `.agents/` 10 个模块 + `scripts/check.sh`，并把 git 钩子装进 `.git/hooks/` |
 | `--with-ci` | 加 `.github/workflows/check.yml`，每次 push / PR 自动自检 |
-| `--with-hooks` | 加 git 钩子并设置 `core.hooksPath`，提交格式不对直接拒绝 |
+| `--no-hooks` | 不装 git 钩子（默认是装的） |
+| `--minimal` | 只装 `AGENTS.md` + `.agents/`，项目根只多 2 个条目 |
 | `--force` | 覆盖已存在文件（默认不覆盖，只跳过并报告） |
 | `--dry-run` | 只预览，不落盘 |
 

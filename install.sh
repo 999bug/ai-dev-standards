@@ -8,26 +8,32 @@
 #   ./install.sh [目标目录] [选项]
 #
 # 选项：
-#   --minimal       只装 AGENTS.md + .agents/（项目根只多 2 个条目）
-#                   适合不用 Claude Code 的场景；与 --with-* 互斥
+#   --minimal       只装 AGENTS.md + .agents/（项目根只多 2 个条目，不装钩子）
+#                   适合不用 Claude Code 的场景；与 --with-ci / --no-hooks 互斥
+#   --no-hooks      不装 git 钩子（默认是装的）
 #   --with-ci       额外装 .github/workflows/check.yml
-#   --with-hooks    额外装 git 钩子并设置 core.hooksPath
 #   --force         覆盖已存在的文件（危险，先确认）
 #   --dry-run       只打印将要做什么，不落盘
+#
+# 钩子装到 .git/hooks/（git 默认位置），不占项目根目录条目，也不需要 core.hooksPath。
+# 代价是它不进版本控制：别人 clone 后要各自装一次。想团队共享钩子可自己改成
+# core.hooksPath 方案，本安装器不做。
 #
 # 分级（项目根目录新增的条目数）：
 #   --minimal                       2 个：AGENTS.md、.agents/
 #   （默认）                        4 个：再加 CLAUDE.md、scripts/
-#   默认 + --with-hooks             5 个：再加 templates/githooks/
-#   默认 + --with-hooks --with-ci   6 个：再加 .github/workflows/
+#                                  另有 .git/hooks/ 下的两个钩子（不计入根目录）
+#   默认 + --with-ci                5 个：再加 .github/workflows/
 #
 # 例子：
 #   ./install.sh ~/code/my-project --dry-run
 #   ./install.sh ~/code/my-project --minimal
-#   ./install.sh ~/code/my-project --with-hooks --with-ci
+#   ./install.sh ~/code/my-project --no-hooks
+#   ./install.sh ~/code/my-project --with-ci
 #
 # 设计原则：不覆盖已存在的文件。目标项目可能已经改过 AGENTS.md 或某个模块，
 # 直接覆盖等于抹掉别人的工作。要覆盖必须显式加 --force。
+# 钩子是例外：装了才生效，所以已有同名钩子会先备份再覆盖。
 
 set -uo pipefail
 
@@ -35,7 +41,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 target="."
 with_ci=0
-with_hooks=0
+with_hooks=1          # 默认装钩子
 minimal=0
 force=0
 dry=0
@@ -43,19 +49,20 @@ dry=0
 for arg in "$@"; do
     case "$arg" in
         --minimal)    minimal=1 ;;
+        --no-hooks)   with_hooks=0 ;;
+        --with-hooks) with_hooks=1 ;;   # 兼容旧写法，已是默认行为
         --with-ci)    with_ci=1 ;;
-        --with-hooks) with_hooks=1 ;;
         --force)      force=1 ;;
         --dry-run)    dry=1 ;;
-        -h|--help)    sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help)    sed -n '2,42p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)           echo "未知选项: $arg" >&2; exit 2 ;;
         *)            target="$arg" ;;
     esac
 done
 
-if [ "$minimal" -eq 1 ] && { [ "$with_ci" -eq 1 ] || [ "$with_hooks" -eq 1 ]; }; then
-    echo "--minimal 与 --with-hooks / --with-ci 互斥。" >&2
-    echo "要么用 --minimal 只装核心，要么去掉 --minimal 装完整版。" >&2
+if [ "$minimal" -eq 1 ] && { [ "$with_ci" -eq 1 ] || [ "$with_hooks" -eq 0 ]; }; then
+    echo "--minimal 与 --with-ci / --no-hooks 互斥。" >&2
+    echo '--minimal 本身就是「只装核心」，不需要再叠加这些开关。' >&2
     exit 2
 fi
 
@@ -141,17 +148,53 @@ else
 
     if [ "$with_hooks" -eq 1 ]; then
         log "5. git 钩子"
-        put "$REPO_ROOT/templates/githooks/commit-msg"  "$target/templates/githooks/commit-msg"
-        put "$REPO_ROOT/templates/githooks/post-commit" "$target/templates/githooks/post-commit"
-        if [ "$dry" -eq 0 ] && [ -d "$target/templates/githooks" ]; then
-            chmod +x "$target/templates/githooks/"* 2>/dev/null
-            if git -C "$target" rev-parse --git-dir >/dev/null 2>&1; then
-                git -C "$target" config core.hooksPath templates/githooks
-                log "  core.hooksPath -> templates/githooks"
-            else
-                log "  ! 目标不是 git 仓库，跳过 hooksPath 配置"
-            fi
+
+        git_dir=""
+        if git -C "$target" rev-parse --absolute-git-dir >/dev/null 2>&1; then
+            git_dir=$(git -C "$target" rev-parse --absolute-git-dir)
         fi
+
+        if [ -z "$git_dir" ]; then
+            log "  ! 目标不是 git 仓库，跳过钩子安装（装到 .git/hooks/ 需要仓库）"
+        else
+            hook_dir="$git_dir/hooks"
+
+            # core.hooksPath 一旦设置，git 就完全不看 .git/hooks/ 了
+            configured_hooks_path=$(git -C "$target" config core.hooksPath 2>/dev/null)
+            if [ -n "$configured_hooks_path" ]; then
+                log "  ! 该项目已配置 core.hooksPath=$configured_hooks_path"
+                log "    git 会忽略 .git/hooks/，刚装的钩子不会生效。"
+                log "    用之前先执行：git config --unset core.hooksPath"
+            fi
+
+            for h in commit-msg post-commit; do
+                src="$REPO_ROOT/templates/githooks/$h"
+                dst="$hook_dir/$h"
+                [ -f "$src" ] || continue
+
+                if [ "$dry" -eq 1 ]; then
+                    log "  [预览] .git/hooks/$h"
+                    copied=$((copied + 1))
+                    continue
+                fi
+
+                mkdir -p "$hook_dir"
+
+                # 钩子必须覆盖才生效，但已有的先备份，不静默丢用户的钩子
+                if [ -f "$dst" ]; then
+                    backup="$dst.bak.$(date +%Y%m%d%H%M%S)"
+                    if cp "$dst" "$backup" 2>/dev/null; then
+                        log "  已有 $h，已备份为 $(basename "$backup")"
+                    else
+                        log "  ! 已有 $h，备份失败，仍继续覆盖"
+                    fi
+                fi
+
+                cp "$src" "$dst" && chmod +x "$dst" && copied=$((copied + 1))
+            done
+        fi
+    else
+        log "4. 已跳过钩子（--no-hooks）"
     fi
 fi
 
