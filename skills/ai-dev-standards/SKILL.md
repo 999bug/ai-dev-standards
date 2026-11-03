@@ -35,7 +35,7 @@ Read <插件根>/SKILL.md
 
 4. **填 profile（不能跳过）**：`.agents/project-profile.md` 里全是「未定」。从项目本身读事实（`pom.xml`、`package.json`、`.github/workflows/`），能推断的直接填，推断不了的一次性列出来问用户。填写规范见 `<插件根>/references/profile-guide.md`。
 
-5. **验证**：`cd <目标目录> && bash scripts/check.sh`，五项全绿才算装好。
+5. **验证**：新会话问「改 Java 代码前要先读哪个文件」，答出 `.agents/lang-java.md` 即为生效。装了 `--with-check` 的话也可跑 `bash scripts/check.sh` 做五项自检。
 
 ## 模板清单
 

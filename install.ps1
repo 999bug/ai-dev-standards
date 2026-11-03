@@ -13,13 +13,16 @@
 .PARAMETER Minimal
     只装 AGENTS.md + .agents/，项目根只多 2 个条目，不装钩子。
     适合不用 Claude Code 的场景——它不装 CLAUDE.md，Claude Code 会读不到规范。
-    与 -NoHooks / -WithCi 互斥。
+    与 -NoHooks / -WithCheck / -WithCi 互斥。
 
 .PARAMETER NoHooks
     不装 git 钩子。钩子默认是装的，装到 .git/hooks/。
 
+.PARAMETER WithCheck
+    额外装 scripts/check.sh（五项自检）。默认不装。
+
 .PARAMETER WithCi
-    同时安装 .github/workflows/check.yml。
+    额外安装 .github/workflows/check.yml。会自动带上 scripts/check.sh，因为 CI 跑的就是它。
 
 .PARAMETER WithHooks
     兼容旧写法保留；钩子现在是默认行为，不需要显式指定。
@@ -44,6 +47,7 @@ param(
     [string]$Target = '.',
     [switch]$Minimal,
     [switch]$NoHooks,
+    [switch]$WithCheck,
     [switch]$WithCi,
     [switch]$WithHooks,
     [switch]$Force,
@@ -55,8 +59,11 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = $PSScriptRoot
 
-if ($Minimal -and ($WithCi -or $NoHooks)) {
-    throw '-Minimal 与 -WithCi / -NoHooks 互斥。-Minimal 本身就是只装核心，不需要再叠加这些开关。'
+# CI 里跑的就是 scripts/check.sh，要装 CI 就必须带上它
+if ($WithCi) { $WithCheck = $true }
+
+if ($Minimal -and ($WithCi -or $WithCheck -or $NoHooks)) {
+    throw '-Minimal 与 -WithCheck / -WithCi / -NoHooks 互斥。-Minimal 本身就是只装核心，不需要再叠加这些开关。'
 }
 
 if (-not (Test-Path (Join-Path $repoRoot 'AGENTS.md')) -or
@@ -123,8 +130,15 @@ else {
     Write-Host '2. 工具入口'
     Write-File (Join-Path $repoRoot 'CLAUDE.md') (Join-Path $target 'CLAUDE.md')
 
-    Write-Host '3. 自检脚本'
-    Write-File (Join-Path $repoRoot 'scripts/check.sh') (Join-Path $target 'scripts/check.sh')
+    if ($WithCheck) {
+        if ($WithCi) {
+            Write-Host '3. 自检脚本（CI 依赖它，自动带上）'
+        }
+        else {
+            Write-Host '3. 自检脚本'
+        }
+        Write-File (Join-Path $repoRoot 'scripts/check.sh') (Join-Path $target 'scripts/check.sh')
+    }
 
     if ($WithCi) {
         Write-Host '4. GitHub Actions 门禁'
@@ -211,7 +225,7 @@ if (-not $DryRun) {
     Write-Host '  文件里全是「未定」。逐项确认后再开工——'
     Write-Host '  规范要求 AI 遇到未定项必须停下来问，不许拿示例值当事实。'
     Write-Host '  字段说明见 references/profile-guide.md'
-    if (-not $Minimal) {
+    if ((Test-Path (Join-Path $target 'scripts/check.sh')) -and (-not $DryRun)) {
         Write-Host ''
         Write-Host "验证安装：cd `"$target`"; bash scripts/check.sh"
     }

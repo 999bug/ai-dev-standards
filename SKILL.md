@@ -37,8 +37,9 @@ Windows：
 
 | 选项 | 作用 |
 | --- | --- |
-| （无） | `AGENTS.md` + `CLAUDE.md` + `.agents/` 10 个模块 + `scripts/check.sh`，并把 git 钩子装进 `.git/hooks/` |
-| `--with-ci` | 加 `.github/workflows/check.yml`，每次 push / PR 自动自检 |
+| （无） | `AGENTS.md` + `CLAUDE.md` + `.agents/` 10 个模块，并把 git 钩子装进 `.git/hooks/` |
+| `--with-check` | 加 `scripts/check.sh`（五项自检） |
+| `--with-ci` | 加 `.github/workflows/check.yml`，会自动带上 `check.sh` |
 | `--no-hooks` | 不装 git 钩子（默认是装的） |
 | `--minimal` | 只装 `AGENTS.md` + `.agents/`，项目根只多 2 个条目 |
 | `--force` | 覆盖已存在文件（默认不覆盖，只跳过并报告） |
@@ -62,12 +63,20 @@ Windows：
 
 ## 验证
 
+新会话里问一句，答得出就是生效了：
+
+> 按你读到的规范回答：① 改 Java 代码前要先读哪个文件？② 提交信息的类型有哪些？
+
+答案应是 `.agents/lang-java.md` 和 `NF/BF/IM/SC/CU/RF/Doc/OT/Tag`。
+
+装了 `--with-check` 的话也可以跑自检：
+
 ```bash
 cd /path/to/your-project
 bash scripts/check.sh
 ```
 
-五项全绿才算装好：入口行数、明文邮箱、模块登记、交叉引用、代码块闭合。
+五项全绿：入口行数、明文邮箱、模块登记、交叉引用、代码块闭合。
 
 ## 安装后怎么用
 

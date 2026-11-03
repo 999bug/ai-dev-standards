@@ -42,11 +42,14 @@ chmod +x install.sh
 ## 3. 正式安装
 
 ```bash
-# 默认：AGENTS.md + CLAUDE.md + .agents/ + scripts/check.sh
+# 默认：AGENTS.md + CLAUDE.md + .agents/
 #       外加 .git/hooks/ 下的两个钩子（钩子不占项目根目录条目）
 ./install.sh /path/to/your-project
 
-# 再加 CI 门禁
+# 加自检脚本
+./install.sh /path/to/your-project --with-check
+
+# 加 CI 门禁（会自动带上 check.sh）
 ./install.sh /path/to/your-project --with-ci
 
 # 只要规范核心，不要钩子
@@ -62,18 +65,21 @@ chmod +x install.sh
 
 | 选项（sh / ps1） | 装什么 | 项目根新增 |
 | --- | --- | --- |
-| 默认 | 入口 + 10 个模块 + `CLAUDE.md` + 自检脚本，并把钩子装进 `.git/hooks/` | 4 个 |
-| `--no-hooks` / `-NoHooks` | 同上，但不装钩子 | 4 个 |
-| `--with-ci` / `-WithCi` | 再加 `.github/workflows/check.yml` | 5 个 |
+| 默认 | 入口 + 10 个模块 + `CLAUDE.md`，并把钩子装进 `.git/hooks/` | 3 个 |
+| `--no-hooks` / `-NoHooks` | 同上，但不装钩子 | 3 个 |
+| `--with-check` / `-WithCheck` | 再加 `scripts/check.sh`（五项自检） | 4 个 |
+| `--with-ci` / `-WithCi` | 再加 `.github/workflows/check.yml`；会自动带上 `check.sh` | 5 个 |
 | `--minimal` / `-Minimal` | 只装 `AGENTS.md` + `.agents/`，也不装钩子 | 2 个 |
 | `--force` / `-Force` | 覆盖已存在文件 | — |
 | `--dry-run` / `-DryRun` | 只预览，不落盘 | — |
 
 **钩子默认就装**，位置是 `.git/hooks/`，不占项目根目录、也不需要配 `core.hooksPath`。代价是它不进版本控制，别人 clone 后要各自装一次。
 
+**自检脚本默认不装**——多数项目不会去改 `.agents/` 模块，用不上。想跑自检就加 `--with-check`；装了 `--with-ci` 会自动带上，因为 CI 里跑的就是它。
+
 两条约束：
 
-- `--minimal` 与 `--no-hooks` / `--with-ci` 互斥。它也不装 `CLAUDE.md`，Claude Code 会读不到规范，只适合完全不用 Claude Code 的场景。
+- `--minimal` 与 `--no-hooks` / `--with-check` / `--with-ci` 互斥。它也不装 `CLAUDE.md`，Claude Code 会读不到规范，只适合完全不用 Claude Code 的场景。
 - **默认不覆盖已存在的文件**。装过一次再跑是幂等的（写入 0，全部跳过）。目标项目可能已经改过某个模块，要覆盖必须显式加 `--force`，先确认清楚。钩子是例外——装了才生效，所以已有同名钩子会先备份再覆盖。
 
 ## 4. 确认装了什么

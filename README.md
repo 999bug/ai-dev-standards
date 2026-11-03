@@ -2,7 +2,7 @@
 
 装进项目就能生效的一套分层开发规范：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 10 个模块，可选提交门禁与 CI 自检。目标是让 AI 按你的意图改代码，而不是按它的默认习惯。
 
-装完一个项目只多 4 个条目：`AGENTS.md`、`.agents/`、`CLAUDE.md`、`scripts/`。
+装完一个项目只多 3 个条目：`AGENTS.md`、`.agents/`、`CLAUDE.md`。钩子进 `.git/hooks/`，不占根目录。
 
 ## 安装（Claude Code 插件市场，推荐）
 
@@ -21,7 +21,7 @@ claude plugin install ai-dev-standards@ai-dev-standards --scope local
 
 ```text
 [ai-dev-standards] 本项目还没有 AI 开发规范，已自动安装。
-  写入 15 个文件，跳过 0 个已存在的文件
+  写入 14 个文件，跳过 0 个已存在的文件
 ```
 
 自动安装走**默认级别**：规范文件 + git 钩子。钩子进 `.git/hooks/`，不占项目根目录条目。不写 CI——往 `.github/` 里加文件应该由你主动决定，需要时重跑安装器加 `--with-ci`。
@@ -67,11 +67,19 @@ claude plugin marketplace remove ai-dev-standards
 
 ### 3. 验证
 
+新会话里问：
+
+> 按你读到的规范回答：① 改 Java 代码前要先读哪个文件？② 提交信息的类型有哪些？
+
+答案应是 `.agents/lang-java.md` 和 `NF/BF/IM/SC/CU/RF/Doc/OT/Tag`。答不出来说明 `CLAUDE.md` 首行缺 `@AGENTS.md`。
+
+自检脚本默认不装（多数项目用不到）。想跑就装 `--with-check`，然后：
+
 ```bash
 bash scripts/check.sh
 ```
 
-五项全绿才算装好：入口行数、明文邮箱、模块登记、交叉引用、代码块闭合。
+五项全绿：入口行数、明文邮箱、模块登记、交叉引用、代码块闭合。
 
 ## 要改哪些文件
 
@@ -81,7 +89,7 @@ bash scripts/check.sh
 | `AGENTS.md` | 一般不动 | 只在新增语言/平台模块时，往第 2、3 节分流表登记一行 |
 | `.agents/*.md` | 按需 | 团队自己的约定写进对应模块，不要都堆到入口文件 |
 | `CLAUDE.md` | 项目原来有才动 | 原有内容保留，只在第一行加 `@AGENTS.md` |
-| `scripts/check.sh` | 不动 | 自检脚本，改它等于把规则检查绕过去 |
+| `scripts/check.sh` | 不动 | 只有装了 `--with-check`（或 `--with-ci`）才有；改它等于把规则检查绕过去 |
 | `.github/workflows/check.yml` | 可选 | 只有 `--with-ci` 才装；改触发策略时才动 |
 
 ## 其他 agent
@@ -112,7 +120,7 @@ bash scripts/check.sh
 | `.agents/lang-*.md` | 改对应语言时 | Java / Python / Vue 各自的坑，通用纪律不重复 |
 | `.agents/release-*.md` | 发版、改镜像 | GitHub Actions 与 Docker 的发布、回滚 |
 | `CLAUDE.md` | Claude Code 会话 | 一行 `@AGENTS.md`，让只认 CLAUDE.md 的工具读到同一份规范 |
-| `scripts/check.sh` | 本地或 CI | 五项自检，见上 |
+| `scripts/check.sh` | 按需（`--with-check`） | 五项自检；CI 也调用它 |
 | `.git/hooks/`（装进去的） | 提交时 | `commit-msg` 校验提交信息；`post-commit` 在有 `.codegraph/` 时同步索引 |
 | `templates/github/check.yml` | 目标项目的 CI | 自检 + 历史邮箱扫描 |
 
