@@ -18,13 +18,16 @@ cd ai-dev-standards
 
 Windows 用同目录下的 `install.ps1`（参数见下表，写法为 `-Target` / `-WithHooks` / `-WithCi` / `-Force` / `-DryRun`）。
 
-| 选项 | 作用 |
-| --- | --- |
-| （无） | `AGENTS.md` + `CLAUDE.md` + `.agents/` 10 个模块 + `scripts/check.sh` |
-| `--with-ci` | 加 `.github/workflows/check.yml`，每次 push / PR 自动自检 |
-| `--with-hooks` | 加 git 钩子并设置 `core.hooksPath`，提交格式不对直接拒绝 |
-| `--force` | 覆盖已存在文件 |
-| `--dry-run` | 只预览，不落盘 |
+| 选项 | 装什么 | 项目根新增条目 |
+| --- | --- | --- |
+| `--minimal` | 只装 `AGENTS.md` + `.agents/`（10 个模块） | **2 个** |
+| （默认） | 再加 `CLAUDE.md`、`scripts/check.sh` | 4 个 |
+| `--with-hooks` | 再加 git 钩子，自动设好 `core.hooksPath` | 5 个 |
+| `--with-ci` | 再加 `.github/workflows/check.yml` | 6 个 |
+| `--force` | 覆盖已存在文件 | — |
+| `--dry-run` | 只预览，不落盘 | — |
+
+`--minimal` 只多两个条目，适合不想让项目根变乱、且不用 Claude Code 的场景——它**不装 `CLAUDE.md`，Claude Code 会读不到这套规范**。需要 Claude Code 就用默认级别。`--minimal` 与 `--with-hooks` / `--with-ci` 互斥。
 
 **默认不覆盖已存在的文件**，装过一次后再跑是幂等的（写入 0，全部跳过）。要覆盖必须显式加 `--force`——目标项目可能已经改过某个模块，盲目覆盖等于抹掉别人的工作。
 
@@ -103,11 +106,11 @@ claude plugin install ai-dev-standards --marketplace 999bug/ai-dev-standards --s
 
 三个条件都满足，**还要退出重进一次会话**才会触发。装完插件不重启会话，当前会话不会跑 hook。
 
-成功时屏幕上会出现：
+成功时屏幕上会出现（hook 走**默认级别**，不装 git 钩子与 CI——那两样会改变提交行为、写进 `.github/`，应该由你主动选择）：
 
 ```
 [ai-dev-standards] 本项目还没有 AI 开发规范，已自动安装。
-  写入 16 个文件，跳过 0 个已存在的文件
+  写入 13 个文件，跳过 0 个已存在的文件
 ```
 
 什么都没输出，按顺序排查：是不是 git 仓库 → 是不是已经装过 → 有没有豁免标记 → 都没有就跑 `claude --debug` 看 hook 有没有加载。

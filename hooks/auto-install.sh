@@ -39,7 +39,10 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 # 找不到安装器就放弃（插件结构异常）
 [ -f "$plugin/install.sh" ] || exit 0
 
-out=$(bash "$plugin/install.sh" "$project" --with-hooks --with-ci 2>&1) || exit 0
+# 自动安装用默认级别：不装 git 钩子与 CI。
+# 钩子会改变提交行为、CI 会写进 .github/，这些应该由用户主动选择，
+# 不该由一次会话启动悄悄做掉。需要的话重跑 install.sh --with-hooks --with-ci。
+out=$(bash "$plugin/install.sh" "$project" 2>&1) || exit 0
 
 echo "[ai-dev-standards] 本项目还没有 AI 开发规范，已自动安装。"
 echo "$out" | grep -E '写入|跳过' | sed 's/^/  /'

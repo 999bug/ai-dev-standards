@@ -8,15 +8,23 @@
 #   ./install.sh [目标目录] [选项]
 #
 # 选项：
-#   --with-ci       同时安装 .github/workflows/check.yml
-#   --with-hooks    安装 git 钩子并设置 core.hooksPath
+#   --minimal       只装 AGENTS.md + .agents/（项目根只多 2 个条目）
+#                   适合不用 Claude Code 的场景；与 --with-* 互斥
+#   --with-ci       额外装 .github/workflows/check.yml
+#   --with-hooks    额外装 git 钩子并设置 core.hooksPath
 #   --force         覆盖已存在的文件（危险，先确认）
 #   --dry-run       只打印将要做什么，不落盘
 #
+# 分级（项目根目录新增的条目数）：
+#   --minimal                       2 个：AGENTS.md、.agents/
+#   （默认）                        4 个：再加 CLAUDE.md、scripts/
+#   默认 + --with-hooks             5 个：再加 templates/githooks/
+#   默认 + --with-hooks --with-ci   6 个：再加 .github/workflows/
+#
 # 例子：
 #   ./install.sh ~/code/my-project --dry-run
+#   ./install.sh ~/code/my-project --minimal
 #   ./install.sh ~/code/my-project --with-hooks --with-ci
-#   ./install.sh .                       # 装到当前目录
 #
 # 设计原则：不覆盖已存在的文件。目标项目可能已经改过 AGENTS.md 或某个模块，
 # 直接覆盖等于抹掉别人的工作。要覆盖必须显式加 --force。
@@ -28,20 +36,28 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 target="."
 with_ci=0
 with_hooks=0
+minimal=0
 force=0
 dry=0
 
 for arg in "$@"; do
     case "$arg" in
+        --minimal)    minimal=1 ;;
         --with-ci)    with_ci=1 ;;
         --with-hooks) with_hooks=1 ;;
         --force)      force=1 ;;
         --dry-run)    dry=1 ;;
-        -h|--help)    sed -n '2,26p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help)    sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)           echo "未知选项: $arg" >&2; exit 2 ;;
         *)            target="$arg" ;;
     esac
 done
+
+if [ "$minimal" -eq 1 ] && { [ "$with_ci" -eq 1 ] || [ "$with_hooks" -eq 1 ]; }; then
+    echo "--minimal 与 --with-hooks / --with-ci 互斥。" >&2
+    echo "要么用 --minimal 只装核心，要么去掉 --minimal 装完整版。" >&2
+    exit 2
+fi
 
 if [ ! -d "$target" ]; then
     echo "目标目录不存在: $target" >&2
@@ -92,40 +108,54 @@ log "模板来源: $REPO_ROOT"
 log "目标项目: $target"
 log ""
 
-log "1. 核心规范文件"
+# ---------- 核心：AGENTS.md + .agents/ ----------
+log "1. 核心规范"
 put "$REPO_ROOT/AGENTS.md" "$target/AGENTS.md"
-put "$REPO_ROOT/CLAUDE.md" "$target/CLAUDE.md"
 for f in "$REPO_ROOT"/.agents/*.md; do
     [ -e "$f" ] || continue
     put "$f" "$target/.agents/$(basename "$f")"
 done
 
-log "2. 自检脚本"
-put "$REPO_ROOT/scripts/check.sh" "$target/scripts/check.sh"
-if [ "$dry" -eq 0 ] && [ -f "$target/scripts/check.sh" ]; then
-    chmod +x "$target/scripts/check.sh"
-fi
+if [ "$minimal" -eq 1 ]; then
+    # ---------- minimal：到此为止 ----------
+    log ""
+    log "2. 已跳过（--minimal）：CLAUDE.md、scripts/check.sh、钩子、CI"
+    log "   ! 没装 CLAUDE.md，Claude Code 将读不到这套规范。"
+    log "     需要的话去掉 --minimal 重跑，或手动建 CLAUDE.md 写一行 @AGENTS.md"
+else
+    # ---------- 工具入口：CLAUDE.md ----------
+    log "2. 工具入口"
+    put "$REPO_ROOT/CLAUDE.md" "$target/CLAUDE.md"
 
-if [ "$with_ci" -eq 1 ]; then
-    log "3. GitHub Actions 门禁"
-    put "$REPO_ROOT/templates/github/check.yml" "$target/.github/workflows/check.yml"
-fi
+    # ---------- 自检脚本 ----------
+    log "3. 自检脚本"
+    put "$REPO_ROOT/scripts/check.sh" "$target/scripts/check.sh"
+    if [ "$dry" -eq 0 ] && [ -f "$target/scripts/check.sh" ]; then
+        chmod +x "$target/scripts/check.sh"
+    fi
 
-if [ "$with_hooks" -eq 1 ]; then
-    log "4. git 钩子"
-    put "$REPO_ROOT/templates/githooks/commit-msg"  "$target/templates/githooks/commit-msg"
-    put "$REPO_ROOT/templates/githooks/post-commit" "$target/templates/githooks/post-commit"
-    if [ "$dry" -eq 0 ] && [ -d "$target/templates/githooks" ]; then
-        chmod +x "$target/templates/githooks/"* 2>/dev/null
-        if git -C "$target" rev-parse --git-dir >/dev/null 2>&1; then
-            git -C "$target" config core.hooksPath templates/githooks
-            log "  core.hooksPath -> templates/githooks"
-        else
-            log "  ! 目标不是 git 仓库，跳过 hooksPath 配置"
+    if [ "$with_ci" -eq 1 ]; then
+        log "4. GitHub Actions 门禁"
+        put "$REPO_ROOT/templates/github/check.yml" "$target/.github/workflows/check.yml"
+    fi
+
+    if [ "$with_hooks" -eq 1 ]; then
+        log "5. git 钩子"
+        put "$REPO_ROOT/templates/githooks/commit-msg"  "$target/templates/githooks/commit-msg"
+        put "$REPO_ROOT/templates/githooks/post-commit" "$target/templates/githooks/post-commit"
+        if [ "$dry" -eq 0 ] && [ -d "$target/templates/githooks" ]; then
+            chmod +x "$target/templates/githooks/"* 2>/dev/null
+            if git -C "$target" rev-parse --git-dir >/dev/null 2>&1; then
+                git -C "$target" config core.hooksPath templates/githooks
+                log "  core.hooksPath -> templates/githooks"
+            else
+                log "  ! 目标不是 git 仓库，跳过 hooksPath 配置"
+            fi
         fi
     fi
 fi
 
+# ---------- 汇总 ----------
 log ""
 log "────────────────────────────"
 log "写入 $copied 个文件，跳过 $skipped 个已存在的文件"
@@ -144,6 +174,8 @@ if [ "$dry" -eq 0 ]; then
     log "  文件里全是「未定」。逐项确认后再开工——"
     log "  规范要求 AI 遇到未定项必须停下来问，不许拿示例值当事实。"
     log "  字段说明见 references/profile-guide.md"
-    log ""
-    log "验证安装：cd \"$target\" && bash scripts/check.sh"
+    if [ "$minimal" -eq 0 ]; then
+        log ""
+        log "验证安装：cd \"$target\" && bash scripts/check.sh"
+    fi
 fi
