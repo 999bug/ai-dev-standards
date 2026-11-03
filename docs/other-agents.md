@@ -108,14 +108,14 @@ Cursor 支持项目根和子目录的 `AGENTS.md`，不需要转成 `.cursor/rul
 
 Copilot 把 `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` 都识别为 agent instructions，装完即用。
 
-- 仓库级始终生效的是 `.github/copilot-instructions.md`，但它和 `AGENTS.md` 是两套来源。团队主要用 Copilot 时才考虑补这一份，不要两边各写一份规则。
+- 仓库级自定义指令写在 `.github/copilot-instructions.md`，它和 `AGENTS.md` 是两套来源。团队主要用 Copilot 时才考虑补这一份，不要两边各写一份规则。
 - 不同 IDE / 版本对 agent instructions 的支持不完全一致，遇到不生效先看官方支持矩阵。
 
 验证：Copilot Chat 里问「这个项目的完成定义是什么」，应能说出构建通过、测试通过、本地实测、文档同步、工作区干净。
 
 ## Gemini CLI
 
-Gemini CLI 默认读 `GEMINI.md`，不认 `AGENTS.md`。加一个一行的桥接文件即可：
+Gemini CLI 默认读的是 `GEMINI.md`，不是 `AGENTS.md`。加一个一行的桥接文件即可：
 
 ```markdown
 @AGENTS.md
