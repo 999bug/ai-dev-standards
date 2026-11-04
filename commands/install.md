@@ -8,6 +8,10 @@ argument-hint: "[目标项目目录，默认当前目录]"
 目标项目：`$ARGUMENTS`
 没给参数就用当前工作目录。
 
+> 路径解析：`${CLAUDE_PLUGIN_ROOT}` 由插件注入。万一它为空，先跑
+> `ls ~/.claude/plugins/cache/ai-dev-standards/` 找到版本目录，用那个绝对路径代替，
+> 不要凭猜写路径。
+
 ## 1. 先确认目标
 
 ```bash
