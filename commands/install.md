@@ -45,13 +45,13 @@ bash "${CLAUDE_PLUGIN_ROOT}/install.sh" "<目标>"
 用户明确要 CI 或自检脚本时再加 `--with-ci` / `--with-check`；不想装钩子加 `--no-hooks`。
 Windows 等价写法是 `-WithCi` / `-WithCheck` / `-NoHooks`。
 
-## 4. 报告与收尾
+## 4. 报告，然后直接生成 profile
 
 1. 贴出安装器最后几行汇总（写入 / 更新 / 跳过）。
-2. 提醒两件事：
-   - 钩子装在 `.git/hooks/`，不进版本控制，团队其他人 clone 后要各自装；
-     想让门禁跟着仓库走，用 `--shared-hooks`（写 `.githooks/` + `core.hooksPath`）。
-   - `.agents/project-profile.md` 全是「未定」，必须逐项确认。
-3. 主动提出帮用户填 profile：从项目里读事实（`pom.xml` 的 `java.version`、
-   `package.json` 的依赖、`.github/workflows/` 的触发方式），能推断的直接填，
-   推断不了的一次性列出来问。**不要拿示例值当项目事实。**
+2. 提醒一件事：钩子装在 `.git/hooks/`，不进版本控制，团队其他人 clone 后要各自装；
+   想让门禁跟着仓库走，用 `--shared-hooks`（写 `.githooks/` + `core.hooksPath`）。
+3. **不要问「要不要帮你填 profile」，直接读 `commands/profile.md` 并按它的流程执行**：
+   探测项目事实 → 只问四个必须由人决定的问题 → 写出完整的 `.agents/project-profile.md`。
+
+别把「填 profile」当成可选项留给用户手填——28 个「未定」没人愿意逐条查。只有一种情况可以跳过：
+用户明确说了"先别填"。跳过时告诉他随时可以跑 `/ai-dev-standards:profile`。

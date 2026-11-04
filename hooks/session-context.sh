@@ -34,7 +34,8 @@ if [ -f .agents/project-profile.md ]; then
 
     echo "[ai-dev-standards] 本仓库已装这套规范（${undecided} 处「未定」待确认）。"
     if [ "$undecided" -gt 0 ]; then
-        echo "  动手前先确认 project-profile.md，不许拿示例值当项目事实。"
+        echo "  一键填充：/ai-dev-standards:profile（探测项目事实，只问几个必须人决定的选择）"
+        echo "  填充前动手，不许拿示例值当项目事实。"
     fi
     echo "  改代码前按 AGENTS.md 第 3 节分流表加载模块，不要一次性全读。"
 elif [ -f AGENTS.md ]; then

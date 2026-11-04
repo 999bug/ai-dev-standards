@@ -97,11 +97,15 @@ bash scripts/check.sh
 
 Windows 上跑 `check.sh` 需要 Git Bash；也可以直接用项目里的 CI 跑同一份检查。
 
-### 装完必做：填 profile
+### 装完必做：生成 profile
 
-`.agents/project-profile.md` 里全是「未定」，逐项确认。不填等于让 AI 拿示例值当项目事实。字段说明与常见错误见 [`references/profile-guide.md`](../references/profile-guide.md)。
+```text
+/ai-dev-standards:profile
+```
 
-优先补这四个：`build_command`、`test_command`、`git_user_email`、`push_policy`。
+不装插件的话，让 AI 按 [`references/profile-guide.md`](../references/profile-guide.md) 的「一键生成」执行同一套流程：脚本探测 + 只问四个必须由人决定的选择。
+
+探测不到的字段会留「未定」并列成清单。**不填等于让 AI 拿示例值当项目事实**，猜错一次构建脚本比问一句贵得多。
 
 ## 5. 项目里原来就有 CLAUDE.md
 

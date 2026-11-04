@@ -54,21 +54,19 @@ Windows：
 
 **升级用 `--upgrade`，不要用 `--force`**：安装器在 `.agents/.standards-version` 里记了每个文件的 sha256，hash 对得上才覆盖，对不上就写成 `<文件>.new`，你的改动不会丢。
 
-## 安装后必做：填 profile
+## 安装后必做：生成 profile
 
-`.agents/project-profile.md` 里全是「未定」，必须逐项确认。
+`.agents/project-profile.md` 是整套体系唯一需要按项目改的文件。**不要让人对着 28 个「未定」逐项查**，让 AI 跑一遍：
 
-**这是整套体系能否生效的关键。** 一份没填完的 profile 比没有 profile 更危险：AI 会拿示例值当事实，用"看起来合理"的默认值代替项目实际情况，然后一路错下去。
+```
+/ai-dev-standards:profile
+```
 
-项目里已有 `CLAUDE.md` / `AGENTS.md`（`/init` 产物）时，先按 [`references/profile-guide.md`](references/profile-guide.md) 的「自动生成」映射表产出初稿（正文抽取进模板 §10），再逐项确认。
+`scripts/detect-profile.sh` 探测构建命令、语言版本、部署目标、提交风格、目录结构，然后只问四个必须由人决定的选择（仓库性质、提交风格、推送策略、是否现在验证），其余自动写入。
 
-填的时候：
+**这是整套体系能否生效的关键。** 一份没填完的 profile 比没有 profile 更危险：AI 会拿示例值当事实，用"看起来合理"的默认值代替项目实际情况，然后一路错下去。探测不到的字段留「未定」并列清单，不许猜。
 
-1. 从项目里读事实，不要问已知的东西——`pom.xml` 的 `java.version`、`package.json` 的依赖、`.github/workflows/` 的触发方式
-2. 能推断的直接填，推断不了的一次性列出来问
-3. 优先补这四个：`build_command`、`test_command`、`git_user_email`（开源项目一律匿名）、`push_policy`
-
-字段说明见 [`references/profile-guide.md`](references/profile-guide.md)。
+手填或从 `/init` 产物出初稿也可以，映射表见 [`references/profile-guide.md`](references/profile-guide.md)。
 
 ## 验证
 

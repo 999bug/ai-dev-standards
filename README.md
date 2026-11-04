@@ -75,13 +75,20 @@ claude plugin marketplace remove ai-dev-standards
 
 ## 装完之后
 
-### 1. 必改：`.agents/project-profile.md`
+### 1. 一键生成 `.agents/project-profile.md`
 
-里面全是「未定」，逐项确认。这是整套体系能否生效的关键——不填，AI 会拿示例值当项目事实，然后一路错下去。
+安装命令结束时会直接进入这一步；想单独跑也行：
 
-优先补这四个：`build_command`、`test_command`、`git_user_email`（开源项目一律匿名）、`push_policy`。字段说明与常见错误见 [`references/profile-guide.md`](references/profile-guide.md)。
+```text
+/ai-dev-standards:profile
+```
 
-项目里已经有 `CLAUDE.md` / `AGENTS.md`（`/init` 产物）时，可以让 AI 按指南里的「自动生成」映射表直接产出初稿，再逐项确认——比从空白模板手填快得多；正文抽取进模板 §10「项目详细档案」。
+`scripts/detect-profile.sh` 先探测构建/测试命令、语言版本、部署目标、提交风格、目录结构，然后只问你四个必须由人决定的选择——仓库性质（开源 / 个人私有 / 公司内部）、提交信息风格、推送策略、要不要现在跑验证。其余字段自动写进去。
+
+探测不到的会留「未定」并列成清单，不会拿示例值糊弄你。**这份 profile 是整套体系能否生效的关键**：不填，AI 会拿示例值当项目事实，然后一路错下去。字段说明与常见错误见 [`references/profile-guide.md`](references/profile-guide.md)。
+
+也可以手填，或让 AI 按指南里的「自动生成」映射表从 `/init` 产物出初稿——但没必要，探测比手抄准。
+
 
 ### 2. 不用再背那句开场白了
 

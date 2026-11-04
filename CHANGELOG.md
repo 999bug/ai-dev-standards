@@ -3,6 +3,23 @@
 版本号是插件的更新依据：`plugin.json` 里的 `version` 不变，装了插件的用户就收不到新版。
 发版流程见 `scripts/release.sh`。
 
+## [1.6.0] - 2026-11-04
+
+### 新增
+
+- `/ai-dev-standards:profile`：一键生成 project-profile。`scripts/detect-profile.sh` 先探测
+  语言版本、构建/测试命令、部署目标、提交风格、目录结构与 git 身份，再只问四个必须由人
+  决定的选择（仓库性质、提交风格、推送策略、是否现在跑验证），其余自动写入。
+- 安装命令结束后直接进入生成流程，不再让用户对着 28 个「未定」逐项查。
+- 探测脚本对邮箱脱敏：只输出「是不是 noreply」和来源（仓库级 / 全局），不打印真实地址。
+
+### 变更
+
+- `project-profile.md` 模板与 `references/profile-guide.md` 把「一键生成」列为默认填法，
+  手填和 `/init` 产物出初稿降为备选。
+- SessionStart 提醒在仍有「未定」时直接给出 `/ai-dev-standards:profile`。
+- 安装器收尾提示改为「生成 profile」而不是「填 profile」。
+
 ## [1.5.0] - 2026-11-04
 
 ### 破坏性变更

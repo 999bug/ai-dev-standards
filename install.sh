@@ -397,8 +397,9 @@ fi
 
 if [ "$dry" -eq 0 ]; then
     log ""
-    log "下一步（必须）：填 .agents/project-profile.md"
-    log "  文件里全是「未定」。逐项确认后再开工——"
+    log "下一步（必须）：生成 .agents/project-profile.md"
+    log "  文件里全是「未定」。别手填——装过插件的话跑：/ai-dev-standards:profile"
+    log "  它会探测项目事实，只问你几个必须由人决定的选择。"
     log "  规范要求 AI 遇到未定项必须停下来问，不许拿示例值当事实。"
     log "  字段说明见 references/profile-guide.md"
     if [ -f "$target/scripts/check.sh" ] && [ "$dry" -eq 0 ]; then
