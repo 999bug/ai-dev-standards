@@ -19,7 +19,8 @@
 本节是**格式与可读性**要求：不影响编译和运行，但直接影响读代码和 review 的速度，照样要改。判断标准是"别人能不能在一屏内看清这行在做什么"，不是"机器能不能跑"。
 
 - **【默认】禁止用全限定类名（FQN）代替 import**。业务行里出现 `com.foo.bar.Baz`，等于让读者在声明处和调用处各解析一遍包路径，diff 里也只剩一堵包名。
-- **【默认】只有同名类冲突才写全名，且要在那一行注明原因**。用得多的一方 import，另一方只在唯一出现处写全名（`// java.sql.Date 与 java.util.Date 同名，这里要 SQL 的`）。同一文件里禁止一处短名、一处全名混用。
+- **【默认】只有同名类冲突才写全名，并在上一行注明原因**。用得多的一方 import，另一方只在唯一出现处写全名，`// 为什么用全名` 单独占一行；同一文件里禁止一处短名、一处全名混用。
+- **【默认】禁止行尾注释**。注释独立成行，放在被解释语句的**上一行**：`int x = calc(); // 说明` 这种写法，行宽一变、格式化一动就被挤到看不见的地方；写在方法调用的参数中间更糟，一句调用被割成两半，读者得先跳过注释才能找到参数。工具指令是唯一例外（`// NOSONAR` / `// noinspection`），它们必须贴在同一行才生效。
 - **【默认】不用通配导入**（`import com.foo.*`）。它掩盖依赖来源，同名冲突时无法从 import 区判断实际类型；IDE 自动补全产生的通配 import 要展开成具体类名。
 - **【默认】未使用的 import 必须删掉**。它不报错，但会让"这个类依赖什么"判断失真，也是重构没做干净的信号。
 - **【默认】静态导入只给测试断言与常量**（`assertThat` / `mock` / `verify` / `SECONDS`）。`import static com.foo.Utils.parse` 会把调用点变成孤立的 `parse(x)`，读者找不到它属于谁。
@@ -40,6 +41,15 @@ KuduTaskSummary summary = KuduTaskSummaryRegistry.summaryOrStartBackup(rule);
 // ✗ 声明和调用各背一遍包名，一行占两行长度
 com.i2.i2bb.node.transfer.kudu.summary.KuduTaskSummary summary =
     com.i2.i2bb.node.transfer.kudu.summary.KuduTaskSummaryRegistry.summaryOrStartBackup(rule);
+
+// ✗ 行尾注释，还夹在调用参数中间
+org.apache.avro.Schema deltaSchema =
+    KuduAvroSchemaUtil.toAvroSchemaWithOp( // 与 org.apache.kudu.Schema 同名，这里要 Avro 的
+        kuduSchema, op);
+
+// ✓ 说明独立成行，放在被解释语句上一行
+// 与 org.apache.kudu.Schema 同名，这里要 Avro 的
+org.apache.avro.Schema deltaSchema = KuduAvroSchemaUtil.toAvroSchemaWithOp(kuduSchema, op);
 ```
 
 ## 3. 空值与 Optional
@@ -174,4 +184,12 @@ import com.i2.i2bb.node.transfer.kudu.summary.KuduTaskSummary;
 import com.i2.i2bb.node.transfer.kudu.summary.KuduTaskSummaryRegistry;
 
 KuduTaskSummary summary = KuduTaskSummaryRegistry.summaryOrStartBackup(rule);
+
+// ✗ 行尾注释（夹在参数中间更糟）
+call( // 说明
+    a, b);
+
+// ✓ 注释独立成行，放在被解释语句上一行
+// 说明
+call(a, b);
 ```
