@@ -5,7 +5,8 @@
 
 .DESCRIPTION
     本脚本就在仓库根目录，clone 下来直接跑即可。
-    与 install.sh 行为一致：不覆盖已存在的文件，除非显式加 -Force。
+    与 install.sh 行为一致：不覆盖已存在的文件，除非显式加 -Force；
+    升级用 -Upgrade，只覆盖「装完之后没被改过」的文件。
 
 .PARAMETER Target
     目标项目目录，默认当前目录。
@@ -19,13 +20,20 @@
     不装 git 钩子。钩子默认是装的，装到 .git/hooks/。
 
 .PARAMETER WithCheck
-    额外装 scripts/check.sh（五项自检）。默认不装。
+    额外装 scripts/check.sh（七项自检）。默认不装。
 
 .PARAMETER WithCi
     额外安装 .github/workflows/check.yml。会自动带上 scripts/check.sh，因为 CI 跑的就是它。
 
 .PARAMETER WithHooks
     兼容旧写法保留；钩子现在是默认行为，不需要显式指定。
+
+.PARAMETER Upgrade
+    升级已装的规范：按 .agents/.standards-version 里的 sha256 判断文件是否被本地改过。
+    没改过的覆盖为新版，改过的另存为 <文件>.new。
+
+.PARAMETER SharedHooks
+    钩子写进项目的 .githooks/ 并设置 core.hooksPath，跟仓库一起提交，团队 clone 后直接生效。
 
 .PARAMETER Force
     覆盖已存在的文件。
@@ -37,10 +45,10 @@
     .\install.ps1 -Target F:\code\my-project -DryRun
 
 .EXAMPLE
-    .\install.ps1 -Target F:\code\my-project -Minimal
+    .\install.ps1 -Target F:\code\my-project -Upgrade
 
 .EXAMPLE
-    .\install.ps1 -Target . -WithHooks -WithCi
+    .\install.ps1 -Target F:\code\my-project -SharedHooks -WithCi
 #>
 [CmdletBinding()]
 param(
@@ -50,6 +58,8 @@ param(
     [switch]$WithCheck,
     [switch]$WithCi,
     [switch]$WithHooks,
+    [switch]$Upgrade,
+    [switch]$SharedHooks,
     [switch]$Force,
     [switch]$DryRun
 )
@@ -73,43 +83,162 @@ if (-not (Test-Path (Join-Path $repoRoot 'AGENTS.md')) -or
 if (-not (Test-Path $Target)) {
     throw "目标目录不存在: $Target"
 }
-$target = (Resolve-Path $Target).Path
+$target = (Resolve-Path $Target).Path.TrimEnd('\', '/')
 
-if ($target -eq (Resolve-Path $repoRoot).Path) {
+if ($target -eq (Resolve-Path $repoRoot).Path.TrimEnd('\', '/')) {
     throw '目标目录就是本仓库，跳过。'
 }
 
-$script:copied = 0
+# 版本号只有一个来源：插件清单。-Upgrade 靠它写进安装清单。
+$manifestJson = Join-Path $repoRoot '.claude-plugin/plugin.json'
+$version = 'unknown'
+if (Test-Path $manifestJson) {
+    try {
+        $version = (Get-Content $manifestJson -Raw | ConvertFrom-Json).version
+    }
+    catch { $version = 'unknown' }
+}
+
+$manifestPath = Join-Path $target '.agents/.standards-version'
+
+$script:created = 0
+$script:updated = 0
 $script:skipped = 0
-$script:skippedList = [System.Collections.Generic.List[string]]::new()
+$script:conflicts = 0
+$script:skipList = [System.Collections.Generic.List[string]]::new()
+$script:conflictList = [System.Collections.Generic.List[string]]::new()
+$script:managed = [System.Collections.Generic.List[string]]::new()
+$script:preserved = [System.Collections.Generic.Dictionary[string, string]]::new()
 
-function Write-File {
+function Get-RelPath {
+    param([string]$Path)
+    return [System.IO.Path]::GetRelativePath($target, $Path).Replace('\', '/')
+}
+
+function Get-Sha {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return '' }
+    return (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+# 安装清单里记录的、安装当时的 hash
+$script:recorded = @{}
+if (Test-Path $manifestPath) {
+    foreach ($line in Get-Content -Path $manifestPath) {
+        if ($line -match '^file (\S+) ([0-9a-fA-F]{64})$') {
+            $script:recorded[$Matches[1]] = $Matches[2].ToLowerInvariant()
+        }
+    }
+}
+
+function Write-Payload {
     param([string]$Source, [string]$Destination)
-
-    $rel = $Destination.Substring($target.Length).TrimStart('\', '/')
-
-    if ((Test-Path $Destination) -and (-not $Force)) {
-        $script:skipped++
-        $script:skippedList.Add($rel)
-        return
-    }
-
-    if ($DryRun) {
-        Write-Host "  [预览] $rel"
-        $script:copied++
-        return
-    }
-
     $parent = Split-Path -Parent $Destination
     if ($parent -and -not (Test-Path $parent)) {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
     }
     Copy-Item -Path $Source -Destination $Destination -Force
-    $script:copied++
+}
+
+function Write-File {
+    param([string]$Source, [string]$Destination)
+
+    $rel = Get-RelPath $Destination
+
+    # 目标不存在：新增
+    if (-not (Test-Path $Destination)) {
+        if ($DryRun) {
+            Write-Host "  [预览] 新增 $rel"
+        }
+        else {
+            Write-Payload $Source $Destination
+        }
+        $script:created++
+        $script:managed.Add($rel)
+        return
+    }
+
+    # -Force：无条件覆盖
+    if ($Force) {
+        if ($DryRun) { Write-Host "  [预览] 覆盖 $rel" }
+        else { Write-Payload $Source $Destination }
+        $script:updated++
+        $script:managed.Add($rel)
+        return
+    }
+
+    # 内容相同：跳过，不打扰
+    if ((Get-Sha $Source) -eq (Get-Sha $Destination)) {
+        $script:skipped++
+        $script:managed.Add($rel)
+        return
+    }
+
+    # -Upgrade：只有「没被改过」才覆盖
+    if ($Upgrade) {
+        $rec = ''
+        if ($script:recorded.ContainsKey($rel)) { $rec = $script:recorded[$rel] }
+
+        if ($rec -and $rec -eq (Get-Sha $Destination)) {
+            if ($DryRun) { Write-Host "  [预览] 更新 $rel" }
+            else { Write-Payload $Source $Destination }
+            $script:updated++
+            $script:managed.Add($rel)
+            return
+        }
+
+        if ($DryRun) {
+            Write-Host "  [预览] 冲突 $rel -> $rel.new（本地有改动，不覆盖）"
+        }
+        else {
+            Write-Payload $Source "$Destination.new"
+            Write-Host "  本地已改动，新版写为 $rel.new（确认后可手动合并）"
+        }
+        $script:conflicts++
+        $script:conflictList.Add($rel)
+        # 没装进去，就不能把本地改动后的 hash 记进清单，否则下次 -Upgrade
+        # 会误判成「没被改过」直接覆盖。保留上一次安装时的记录。
+        if ($rec) { $script:preserved[$rel] = $rec }
+        return
+    }
+
+    # 默认：已存在就跳过
+    $script:skipped++
+    $script:skipList.Add($rel)
+    $script:managed.Add($rel)
+}
+
+function Write-Manifest {
+    if ($DryRun) { return }
+    if ($script:managed.Count -eq 0) { return }
+
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $lines.Add('# ai-dev-standards 安装清单，install.ps1 生成，不要手改。')
+    $lines.Add('# 用途：-Upgrade 用这里的 sha256 判断文件是否被本地改过。')
+    $lines.Add("version=$version")
+    $lines.Add("installed=$(Get-Date -Format 'yyyy-MM-dd')")
+
+    foreach ($rel in $script:managed) {
+        $full = Join-Path $target $rel
+        if (-not (Test-Path $full)) { continue }
+        $lines.Add("file $rel $(Get-Sha $full)")
+    }
+    foreach ($entry in $script:preserved.GetEnumerator()) {
+        $lines.Add("file $($entry.Key) $($entry.Value)")
+    }
+
+    $new = $lines -join "`n"
+    $old = if (Test-Path $manifestPath) { Get-Content -Path $manifestPath -Raw } else { '' }
+    if ($new.TrimEnd() -ne $old.TrimEnd()) {
+        $parent = Split-Path -Parent $manifestPath
+        if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+        Set-Content -Path $manifestPath -Value $new -NoNewline:$false -Encoding utf8
+    }
 }
 
 Write-Host "模板来源: $repoRoot"
 Write-Host "目标项目: $target"
+Write-Host "规范版本: $version"
 Write-Host ''
 
 Write-Host '1. 核心规范'
@@ -146,7 +275,7 @@ else {
     }
 
     if (-not $NoHooks) {
-        Write-Host '4. git 钩子'
+        Write-Host '5. git 钩子'
 
         $gitDir = $null
         try {
@@ -156,7 +285,19 @@ else {
         catch { $gitDir = $null }
 
         if (-not $gitDir) {
-            Write-Host '  ! 目标不是 git 仓库，跳过钩子安装（装到 .git/hooks/ 需要仓库）'
+            Write-Host '  ! 目标不是 git 仓库，跳过钩子安装（装钩子需要仓库）'
+        }
+        elseif ($SharedHooks) {
+            # .githooks/ 跟着仓库走：团队 clone 后不用各自装
+            foreach ($h in @('commit-msg', 'post-commit')) {
+                $src = Join-Path $repoRoot "templates/githooks/$h"
+                if (-not (Test-Path $src)) { continue }
+                Write-File $src (Join-Path $target ".githooks/$h")
+            }
+            if (-not $DryRun) {
+                & git -C $target config core.hooksPath .githooks
+                Write-Host '  已设 core.hooksPath=.githooks，钩子会跟仓库一起提交'
+            }
         }
         else {
             $hookDir = Join-Path $gitDir 'hooks'
@@ -167,7 +308,8 @@ else {
             if ($configured) {
                 Write-Host "  ! 该项目已配置 core.hooksPath=$configured"
                 Write-Host '    git 会忽略 .git/hooks/，刚装的钩子不会生效。'
-                Write-Host '    用之前先执行：git config --unset core.hooksPath'
+                Write-Host '    两种处理：git config --unset core.hooksPath（改回 .git/hooks/）'
+                Write-Host '              或用 -SharedHooks 把钩子装进项目里的 .githooks/'
             }
 
             foreach ($h in @('commit-msg', 'post-commit')) {
@@ -176,8 +318,13 @@ else {
                 if (-not (Test-Path $src)) { continue }
 
                 if ($DryRun) {
-                    Write-Host "  [预览] .git/hooks/$h"
-                    $script:copied++
+                    if ((Test-Path $dst) -and ((Get-Sha $src) -eq (Get-Sha $dst))) {
+                        $script:skipped++
+                    }
+                    else {
+                        Write-Host "  [预览] .git/hooks/$h"
+                        $script:created++
+                    }
                     continue
                 }
 
@@ -193,7 +340,13 @@ else {
                     $localCopy = "$dst.local"
 
                     if ($isOurs) {
-                        Write-Host "  更新已有的 $h（旧版规范钩子）"
+                        # 已经是我们的：内容一样就不重写，这样重复安装才是真幂等
+                        if ((Get-Sha $src) -eq (Get-Sha $dst)) {
+                            $script:skipped++
+                            continue
+                        }
+                        Write-Host "  更新 $h（$version）"
+                        $script:updated++
                     }
                     elseif (Test-Path $localCopy) {
                         Write-Host "  已有 $h，原钩子保留在 $h.local，未重复备份"
@@ -210,7 +363,7 @@ else {
                 }
 
                 Copy-Item -Path $src -Destination $dst -Force
-                $script:copied++
+                $script:created++
             }
         }
     }
@@ -219,16 +372,28 @@ else {
     }
 }
 
+Write-Manifest
+
 Write-Host ''
 Write-Host '────────────────────────────'
-Write-Host "写入 $script:copied 个文件，跳过 $script:skipped 个已存在的文件"
+Write-Host "写入 $script:created 个文件，更新 $script:updated 个，跳过 $script:skipped 个已存在的文件"
+if ((-not $DryRun) -and (Test-Path $manifestPath)) {
+    Write-Host "安装清单: .agents/.standards-version（version=$version）"
+}
 
-if ($script:skippedList.Count -gt 0) {
+if ($script:conflicts -gt 0) {
     Write-Host ''
-    Write-Host '以下文件已存在，未被覆盖：'
-    $script:skippedList | ForEach-Object { Write-Host "  $_" }
+    Write-Host "有 $script:conflicts 个文件本地改动过，新版另存为 .new："
+    $script:conflictList | ForEach-Object { Write-Host "  $_" }
+    Write-Host '手动 diff 合并后删掉 .new 即可。'
+}
+
+if ($script:skipList.Count -gt 0) {
     Write-Host ''
-    Write-Host '确认要覆盖请加 -Force 重跑。'
+    Write-Host '以下文件已存在、内容与模板不同，未被覆盖：'
+    $script:skipList | ForEach-Object { Write-Host "  $_" }
+    Write-Host ''
+    Write-Host '只是版本旧了用 -Upgrade；确认要以模板为准请加 -Force 重跑。'
 }
 
 if (-not $DryRun) {

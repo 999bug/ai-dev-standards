@@ -5,55 +5,42 @@ description: Installs a layered AI development standards kit into a project repo
 
 # AI 开发规范（安装器）
 
-本文件位于 `<插件根>/skills/ai-dev-standards/SKILL.md`，模板与脚本在插件根目录（即本文件向上两级）。
-
-完整的安装流程、验证方法与注意事项写在插件根的 `SKILL.md` 里。**先读它**：
+本文件只是插件里的触发入口，**不要在这里找完整流程**：正文在插件根的 `SKILL.md`。
 
 ```
 Read <插件根>/SKILL.md
 ```
 
-## 核心步骤
+`<插件根>` 就是本文件向上两级（`skills/ai-dev-standards/` → `skills/` → 插件根）。
 
-1. **确认目标项目根目录** —— 通常是有 `.git/` 的那一层。先 `ls AGENTS.md .agents/ 2>/dev/null` 确认是否已经装过。
+## 最短路径
 
-2. **预览**（不要跳过）：
-
-   ```bash
-   bash <插件根>/install.sh <目标目录> --dry-run
-   ```
-
-   Windows 用 `<插件根>/install.ps1 -Target <目标目录> -DryRun`。
-
-3. **正式安装**：
+1. 确认目标项目根目录（通常是有 `.git/` 的那一层），先看有没有装过：
 
    ```bash
-   bash <插件根>/install.sh <目标目录> --with-ci
+   ls <目标>/.agents/project-profile.md 2>/dev/null
    ```
 
-   默认不覆盖已存在的文件，装过一次后再跑是幂等的。
+   已经有 → 说明装过了，改用 `/ai-dev-standards:upgrade`，不要重装。
 
-4. **填 profile（不能跳过）**：`.agents/project-profile.md` 里全是「未定」。从项目本身读事实（`pom.xml`、`package.json`、`.github/workflows/`），能推断的直接填，推断不了的一次性列出来问用户。填写规范见 `<插件根>/references/profile-guide.md`。
+2. 预览，把会写哪些文件贴给用户，**等确认**：
 
-5. **验证**：新会话问「改 Java 代码前要先读哪个文件」，答出 `.agents/lang-java.md` 即为生效。装了 `--with-check` 的话也可跑 `bash scripts/check.sh` 做五项自检。
+   ```bash
+   bash <插件根>/install.sh <目标> --dry-run
+   ```
 
-## 模板清单
+3. 安装（默认级别：规范文件 + `CLAUDE.md` + git 钩子）：
 
-插件根目录下这些都是要装到目标项目的：
+   ```bash
+   bash <插件根>/install.sh <目标>
+   ```
 
-| 文件 | 去向 |
-| --- | --- |
-| `AGENTS.md` | 项目根 |
-| `CLAUDE.md` | 项目根（一行 `@AGENTS.md`，给 Claude Code 用） |
-| `.agents/*.md` | 项目的 `.agents/` |
-| `scripts/check.sh` | 项目的 `scripts/` |
-| `templates/githooks/commit-msg` `post-commit` | 项目的 `.git/hooks/`（默认就装） |
-| `templates/github/check.yml` | 项目的 `.github/workflows/`（`--with-ci`） |
+   Windows 无 `bash` 时用 `pwsh -NoProfile -File <插件根>/install.ps1 -Target <目标>`。
 
-## 安装后提醒用户
+4. 填 `.agents/project-profile.md`：从项目里读事实，能推断的直接填，推断不了的一次性列出来问用户。字段说明见 `<插件根>/references/profile-guide.md`。
 
-模块不会自动加载。之后每次开工第一句要说：
+## 边界
 
-> 先读 AGENTS.md 和 .agents/project-profile.md，再按分流表加载本项目需要的模块。
-
-不说这句，模型可能直接开始改代码。
+- 不覆盖已有文件；升级只走 `--upgrade`，不加 `--force`。
+- 不替用户决定装 CI / 自检脚本，除非他明确要。
+- 装完不复述整个规范，只报「装了哪些 + 下一步填 profile」。

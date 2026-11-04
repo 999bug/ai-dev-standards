@@ -6,25 +6,38 @@
 
 ## 安装（Claude Code 插件市场，推荐）
 
-本仓库自己就是一个 Claude Code 插件市场，两条命令装完：
+本仓库自己就是一个 Claude Code 插件市场。先把插件装上：
 
 ```bash
-cd /path/to/your-project
-
 claude plugin marketplace add 999bug/ai-dev-standards
 claude plugin install ai-dev-standards@ai-dev-standards --scope local
 ```
 
 `--scope local` 只在本项目生效；不加默认装成 `user`，所有项目都会带上。
 
-装完 **退出会话再重进**。插件在会话启动时检查当前目录：是 git 仓库、且还没有 `AGENTS.md`，就自动写入规范，屏幕上会看到：
+**装成 `user` 也不会污染仓库**——插件只多出两个命令，不往任何目录写文件。安装规范是显式动作。
+
+装完退出会话再重进（插件在会话启动时加载），然后在目标项目里执行：
 
 ```text
-[ai-dev-standards] 本项目还没有 AI 开发规范，已自动安装。
-  写入 15 个文件，跳过 0 个已存在的文件
+/ai-dev-standards:install
 ```
 
-自动安装走**默认级别**：规范文件 + git 钩子。钩子进 `.git/hooks/`，不占项目根目录条目。不写 CI——往 `.github/` 里加文件应该由你主动决定，需要时重跑安装器加 `--with-ci`。
+它会先跑 `--dry-run` 把「要写哪些文件、跳过哪些」摆给你看，确认后才落盘。默认级别＝规范文件 + `CLAUDE.md` + `.git/hooks/` 下的两个钩子。装完输出：
+
+```text
+写入 15 个文件，更新 0 个，跳过 0 个已存在的文件
+```
+
+要 CI 或自检脚本，跟它说一声加上 `--with-ci` / `--with-check`。
+
+Windows 上没有 `bash` 也不要紧：命令会自动改用 `install.ps1`，效果一样。
+
+### 为什么不再自动安装
+
+1.4.0 及更早的版本把安装挂在 SessionStart 上：装完插件，在任意 git 仓库开一次会话就会写入 15 个文件，其中两个是会改变提交行为的 git 钩子。这有两个问题——它和这套规范自己的第一条红线（先诊断、后动手）冲突；插件装成 `user` scope 时，clone 下来只想看一眼的仓库也会被写。
+
+现在 SessionStart 只做一件事：输出两三行上下文，告诉你这个仓库装没装、profile 还剩几处「未定」、改代码前该按分流表加载模块。不写文件、不执行命令。
 
 ### 官方插件装不上
 
@@ -32,12 +45,15 @@ claude plugin install ai-dev-standards@ai-dev-standards --scope local
 
 **→ [docs/manual-install.md](docs/manual-install.md)**
 
-里面是完整步骤：克隆、预览、正式安装、Windows 写法、只装核心、常见报错、卸载后清理。
+里面是完整步骤：克隆、预览、正式安装、Windows 写法、只装核心、升级、常见报错、卸载后清理。
 
 ### 更新与卸载
 
 ```bash
-# 更新
+# 升级项目里的规范（保留你的本地改动）
+/ai-dev-standards:upgrade
+
+# 升级插件本身
 claude plugin update ai-dev-standards@ai-dev-standards --scope local
 
 # 卸载（scope 要和安装时一致）
@@ -46,6 +62,8 @@ claude plugin uninstall ai-dev-standards@ai-dev-standards --scope local
 # 不再需要这个市场时再移除（会一并卸载它的插件）
 claude plugin marketplace remove ai-dev-standards
 ```
+
+`/ai-dev-standards:upgrade` 靠 `.agents/.standards-version` 里记录的 hash 判断每个文件是否被你改过：没改过的更新成新版，改过的另存为 `<文件>.new`，原文件不动。
 
 卸载只删插件，**已经写进项目的文件不会自动消失**。删哪些、怎么删见 [docs/manual-install.md](docs/manual-install.md#卸载与清理)。
 
@@ -59,13 +77,23 @@ claude plugin marketplace remove ai-dev-standards
 
 项目里已经有 `CLAUDE.md` / `AGENTS.md`（`/init` 产物）时，可以让 AI 按指南里的「自动生成」映射表直接产出初稿，再逐项确认——比从空白模板手填快得多；正文抽取进模板 §10「项目详细档案」。
 
-### 2. 每开一次会话，先说一句
+### 2. 不用再背那句开场白了
+
+以前每次开新会话都要手动说「先读 AGENTS.md 和 profile」。现在插件会在会话启动时自动输出：
+
+```text
+[ai-dev-standards] 本仓库已装这套规范（37 处「未定」待确认）。
+  动手前先确认 project-profile.md，不许拿示例值当项目事实。
+  改代码前按 AGENTS.md 第 3 节分流表加载模块，不要一次性全读。
+```
+
+这段来自 `hooks/session-context.sh`，只读不写。嫌吵可以用环境变量关掉：`AI_DEV_STANDARDS_QUIET=1`（profile 填满后静默）、`AI_DEV_STANDARDS_SKIP=1`（本次会话完全静默）。
+
+没有装插件的项目，仍然靠这句话：
 
 ```text
 先读 AGENTS.md 和 .agents/project-profile.md，再按分流表加载本项目需要的模块。
 ```
-
-模块不会自动加载，靠这句话把分流表打开。不说，模型可能直接开始改代码。
 
 ### 3. 验证
 
@@ -81,7 +109,7 @@ claude plugin marketplace remove ai-dev-standards
 bash scripts/check.sh
 ```
 
-五项全绿：入口行数、明文邮箱、模块登记、交叉引用、代码块闭合。
+七项全绿：入口行数、明文邮箱、模块登记、交叉引用、代码块闭合、数字对账、插件清单。
 
 ## 要改哪些文件
 
@@ -91,6 +119,7 @@ bash scripts/check.sh
 | `AGENTS.md` | 一般不动 | 只在新增语言/平台模块时，往第 2、3 节分流表登记一行 |
 | `.agents/*.md` | 按需 | 团队自己的约定写进对应模块，不要都堆到入口文件 |
 | `CLAUDE.md` | 项目原来有才动 | 原有内容保留，只在第一行加 `@AGENTS.md` |
+| `.agents/.standards-version` | 不动 | 安装清单，`--upgrade` 靠它判断谁改过；手改会让升级误判 |
 | `scripts/check.sh` | 不动 | 只有装了 `--with-check`（或 `--with-ci`）才有；改它等于把规则检查绕过去 |
 | `.github/workflows/check.yml` | 可选 | 只有 `--with-ci` 才装；改触发策略时才动 |
 
@@ -123,19 +152,22 @@ bash scripts/check.sh
 | `.agents/lang-*.md` | 改对应语言时 | Java / Python / Vue 各自的坑，通用纪律不重复 |
 | `.agents/release-*.md` | 发版、改镜像 | GitHub Actions 与 Docker 的发布、回滚 |
 | `CLAUDE.md` | Claude Code 会话 | 一行 `@AGENTS.md`，让只认 CLAUDE.md 的工具读到同一份规范 |
-| `scripts/check.sh` | 按需（`--with-check`） | 五项自检；CI 也调用它 |
+| `.agents/.standards-version` | 升级时 | 版本与每个文件的 sha256，`--upgrade` 据此保留你的改动 |
+| `scripts/check.sh` | 按需（`--with-check`） | 七项自检；CI 也调用它 |
 | `.git/hooks/`（装进去的） | 提交时 | `commit-msg` 校验提交信息；`post-commit` 在有 `.codegraph/` 时同步索引 |
 | `templates/github/check.yml` | 目标项目的 CI | 自检 + 历史邮箱扫描 |
 
-`install.sh` / `install.ps1` 负责把这些装到目标项目，默认不覆盖已有文件。运作原理见 [`references/how-it-works.md`](references/how-it-works.md)，扩展写法见 [`references/extending.md`](references/extending.md)。
+`install.sh` / `install.ps1` 负责把这些装到目标项目，默认不覆盖已有文件。运作原理见 [`references/how-it-works.md`](references/how-it-works.md)，扩展写法见 [`references/extending.md`](references/extending.md)，发版见 [`references/claude-code.md`](references/claude-code.md)。
 
 ## 许可
 
-[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)，可自由复制、修改、商用，需保留署名。全文见 `LICENSE`。
+文档部分 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)，可自由复制、修改、商用，需保留署名，全文见 `LICENSE`。
+
+脚本部分（`install.sh`、`install.ps1`、`hooks/`、`scripts/`、`templates/githooks/`）用 MIT，见 `LICENSE-MIT`——可执行代码用 CC 许可缺少免责与专利条款，不合适。
 
 ```text
-ai-dev-standards by saul, licensed under CC BY 4.0
+ai-dev-standards by saul, licensed under CC BY 4.0 (docs) and MIT (scripts)
 https://github.com/999bug/ai-dev-standards
 ```
 
-last-verified: 2026-11-03
+last-verified: 2026-11-04

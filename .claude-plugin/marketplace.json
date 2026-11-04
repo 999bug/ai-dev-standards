@@ -1,5 +1,6 @@
 {
   "name": "ai-dev-standards",
+  "description": "分层 AI 开发规范的分发市场：AGENTS.md 入口 + .agents/ 任务模块 + 提交门禁与 CI 自检，一条命令装进任意项目。",
   "owner": {
     "name": "saul",
     "url": "https://github.com/999bug"
@@ -8,7 +9,7 @@
     {
       "name": "ai-dev-standards",
       "source": "./",
-      "description": "分层 AI 开发规范：AGENTS.md 入口 + .agents/ 模块 + 提交门禁与 CI 自检，一条命令装进任意项目。"
+      "description": "分层 AI 开发规范：AGENTS.md 入口 + .agents/ 模块 + 提交门禁与 CI 自检。装完插件后在项目里执行 /ai-dev-standards:install。"
     }
   ]
 }

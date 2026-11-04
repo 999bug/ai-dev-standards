@@ -23,12 +23,12 @@ CLAUDE.md（1 行）
 
 ## 方式一：插件市场（推荐）
 
-本仓库同时是一个 Claude Code 插件市场。`.claude-plugin/` 下有 `plugin.json`（插件清单）和 `marketplace.json`（市场清单），skill 在 `skills/ai-dev-standards/`。
+本仓库同时是一个 Claude Code 插件市场。`.claude-plugin/` 下有 `plugin.json`（插件清单）和 `marketplace.json`（市场清单），skill 在 `skills/ai-dev-standards/`，命令在 `commands/`。
 
 ```bash
 # 添加市场，再装插件
 claude plugin marketplace add 999bug/ai-dev-standards
-claude plugin install ai-dev-standards@ai-dev-standards
+claude plugin install ai-dev-standards@ai-dev-standards --scope local
 ```
 
 Claude Code v2.1.292+ 可以合并成一条：
@@ -37,15 +37,35 @@ Claude Code v2.1.292+ 可以合并成一条：
 claude plugin install ai-dev-standards --marketplace 999bug/ai-dev-standards
 ```
 
-更新：
+装完**退出会话再重进**，然后在项目里执行：
 
-```bash
-claude plugin update ai-dev-standards@ai-dev-standards
+```text
+/ai-dev-standards:install
 ```
 
-**发布侧没有提交表单**：把 `marketplace.json` 推进仓库就算发布，谁 clone 到谁就能装。插件清单里的 `version` 决定用户何时收到更新——改了规范就要 bump 它，否则老用户不会自动更新。
+命令会在当前项目里跑安装器：先 `--dry-run` 给你看要写哪些文件，确认后再落盘。默认级别＝规范文件 + `CLAUDE.md` + `.git/hooks/` 下的两个钩子。
 
-如果想进 Anthropic 官方目录（`claude.ai` 和 Cowork 里能搜到），要从 `claude.ai/directory/manage` 提交，需要付费的 claude.ai 计划。官方市场 `claude-plugins-official` 不接受门户提交，只能通过 Anthropic 的合作伙伴渠道谈。
+更新项目里的规范：
+
+```text
+/ai-dev-standards:upgrade
+```
+
+它按 `.agents/.standards-version` 里记录的 sha256 判断每个文件是否被改过：没改过的更新，改过的另存为 `<文件>.new`。**不要用 `--force` 代替升级**，那会连本地改动一起覆盖。
+
+### 发布侧：改版本 → 打 tag
+
+没有提交表单：把 `marketplace.json` 推进仓库就算发布。插件清单里的 `version` 决定用户何时收到更新——内容变了不 bump，老用户永远拿到旧版。
+
+```bash
+bash scripts/release.sh 1.6.0
+```
+
+这条命令会改 `plugin.json` 的版本、在 `CHANGELOG.md` 顶部插入待填条目、跑 `scripts/check.sh`，最后打印 `claude plugin tag` 的命令。tag 由你手动打，脚本不碰 git。
+
+`claude plugin tag` 是官方命令，会校验 `plugin.json` 与 marketplace 条目里的版本一致，再打 `{name}--v{version}` 的 tag。`check.sh` 第 7 项会在版本与 CHANGELOG 不一致时直接失败，所以忘了 bump 在本地就会被拦。
+
+如果想进 Anthropic 官方目录（`claude.ai` 和 Cowork 里能搜到），要从 `claude.ai/directory/manage` 提交，需要付费的 claude.ai 计划。官方市场 `claude-plugins-official` 不接受门户提交，只能通过 Anthropic 的合作伙伴渠道谈。目录要求一个 512–2048 px 的方形 PNG 图标，放在 `.claude-plugin/icon.png`。
 
 ## 方式二：克隆后自己跑安装器
 
@@ -64,7 +84,11 @@ claude
 
 装进 `.git/hooks/` 的 `commit-msg` 是 git 层面的钩子，Claude Code 里跑 `git commit` 一样会被拦。它和 Claude Code 自己的 hooks（`.claude/settings.json`）是两套东西，互不冲突。
 
-还有一种最直接的方式——把整个插件目录放进用户的 skills 目录，Claude Code 启动时会自动加载：
+完整步骤见 [`../docs/manual-install.md`](../docs/manual-install.md)。
+
+## 方式三：放进 skills 目录
+
+把整个仓库放进用户的 skills 目录，Claude Code 启动时会自动加载：
 
 ```bash
 git clone https://github.com/999bug/ai-dev-standards.git ~/.claude/skills/ai-dev-standards
@@ -72,9 +96,15 @@ git clone https://github.com/999bug/ai-dev-standards.git ~/.claude/skills/ai-dev
 
 Windows 上是 `C:\Users\<用户名>\.claude\skills\ai-dev-standards`。这种方式不走市场，也不会自动更新，`git pull` 才拿到新版。
 
-## 插件自带的自动安装
+## 插件自带的 SessionStart 提醒（只读）
 
-装完插件后，**首次在某个 git 项目里启动会话**，插件会自动把规范装进这个项目——不用再说一句话。
+装完插件后，每次在 git 仓库里开新会话，会看到两三行：
+
+```text
+[ai-dev-standards] 本仓库已装这套规范（37 处「未定」待确认）。
+  动手前先确认 project-profile.md，不许拿示例值当项目事实。
+  改代码前按 AGENTS.md 第 3 节分流表加载模块，不要一次性全读。
+```
 
 ### 原理
 
@@ -85,9 +115,13 @@ Windows 上是 `C:\Users\<用户名>\.claude\skills\ai-dev-standards`。这种�
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume",
+        "matcher": "startup|resume|clear",
         "hooks": [
-          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/auto-install.sh\"" }
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-context.sh\" || true",
+            "timeout": 10
+          }
         ]
       }
     ]
@@ -95,50 +129,46 @@ Windows 上是 `C:\Users\<用户名>\.claude\skills\ai-dev-standards`。这种�
 }
 ```
 
-会话启动时执行 `auto-install.sh`，它按顺序判断：
+`session-context.sh` 只读不写，按顺序判断：
 
-1. 当前是不是 git 仓库 —— 不是就退出
-2. 有没有 `AGENTS.md` —— 有就退出（幂等，不会每次重写）
-3. 有没有 `.claude/no-ai-dev-standards` —— 有就退出（单项目豁免）
-4. 都通过 → 调 `install.sh` 装一遍，把结果输出到 stdout
+1. 当前是不是 git 仓库 —— 不是就退出（临时目录、家目录不该被塞提示）
+2. 有 `.agents/project-profile.md` —— 报还剩几处「未定」，提醒按分流表加载模块
+3. 有 `AGENTS.md` 但没有 `.agents/` —— 提示"未介入"，给出安装命令
+4. 什么都没有 —— 提示安装命令
 
-stdout 会进入 Claude 的上下文，所以 Claude 会知道刚装了什么、下一步该填 profile。
+stdout 会进入 Claude 的上下文，所以这条提醒是真的会被读到的，不需要你每次手动说开场白。
+
+### 为什么不自动安装
+
+1.1.0 到 1.4.0 的版本把安装挂在这个 hook 上：会话启动时自动写入 15 个文件，包括两个会改变提交行为的 git 钩子。这有三个问题：
+
+| 问题 | 说明 |
+| --- | --- |
+| 违背规范自己的红线 | `AGENTS.md` 第一条是「先诊断、后动手」。工具自己不遵守，规范就没有说服力 |
+| 作用域失控 | 插件默认装成 `user` scope，于是每个 clone 下来看一眼的仓库都会被写 |
+| 不可审计 | 用户看不到会写什么，也来不及拒绝 |
+
+现在安装是显式动作：`/ai-dev-standards:install`。这和 1.4.0 的"自动安装"相比只多一步，但它把决定权还给了用户。
 
 ### 三个容易误解的点
 
-**① 需要 1.1.0 及以上。** 1.0.0 只有 skill，没有 hook，装了不会自动安装。确认版本：
+**① 需要 1.5.0 及以上。** 1.4.0 及更早装的还是自动安装行为，`/ai-dev-standards:install` 命令也不存在。确认版本：
 
 ```bash
 claude plugin list
 ```
 
-**② 装完插件不会立刻生效。** `plugin install` 只把文件复制到 `~/.claude/plugins/cache/`，不执行任何脚本——Claude Code 没有 post-install 钩子。必须退出会话再重进，SessionStart 才会触发。
+**② 装完插件不会立刻生效。** `plugin install` 只把文件复制到 `~/.claude/plugins/cache/`，不执行任何脚本——Claude Code 没有 post-install 钩子。必须退出会话再重进，命令和 hook 才会加载。
 
 **③ 项目已有 `CLAUDE.md` 时要手动接一下。** 安装器不覆盖已有文件，会跳过它。但那样 `AGENTS.md` 装了也读不到，得在 `CLAUDE.md` 第一行加 `@AGENTS.md`。
 
-### 为什么放在插件里而不是用户全局配置
-
-| 方案 | 作用域 | 副作用 |
-| --- | --- | --- |
-| 用户级 `~/.claude/settings.json` 加 hook | 所有项目 | 每个 clone 下来看一眼的开源仓库也会被塞文件 |
-| **插件自带 hook** | **只影响装了插件的项目** | 卸载插件即失效，不留残留 |
-| 手动跑 `install.sh` | 单次 | 每次都要记着跑 |
-
-插件自带的好处是**行为跟着插件走**：你用 local scope 装在某个项目，就只有那个项目会触发；别人装了同一个插件，也得到同样的自动化，不需要各自配置。
-
-### 时序上的一点差别
-
-`claude plugin install` 本身只复制插件目录，**不会执行任何脚本**——Claude Code 没有 post-install 钩子。
-
-所以严格说是「装完之后的第一次会话启动时才装规范」，而不是「install 命令执行完立刻装」。实际体验上没区别：装完插件重启会话，规范就在了。
-
-### 豁免
+### 开关
 
 ```bash
-# 单个项目永久豁免（推荐给公司项目、别人的仓库）
-mkdir -p .claude && touch .claude/no-ai-dev-standards
+# profile 填满后不再提醒（仍有「未定」时保留告警）
+AI_DEV_STANDARDS_QUIET=1 claude
 
-# 单次会话
+# 本次会话完全静默
 AI_DEV_STANDARDS_SKIP=1 claude
 ```
 
@@ -199,6 +229,6 @@ AI_DEV_STANDARDS_SKIP=1 claude
 | 入口文件 | `CLAUDE.md` | `AGENTS.md`（并通过 `CLAUDE.md` 兼容） |
 | 是否自动读模块 | 否，靠分流表 + 模型主动 Read | 同 |
 | 承诺完成后的门禁 | git hooks + CI | 同 |
-| 额外机制 | `/doctor prompt-audit` 审计指令 | skill 可按需触发安装器 |
+| 额外机制 | 插件命令安装 + SessionStart 上下文提醒 | skill 可按需触发安装器 |
 
 两边共用同一份 `AGENTS.md` 和 `.agents/`，不需要维护两套。改规则只改仓库，两个工具同时生效。

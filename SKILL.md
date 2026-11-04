@@ -1,7 +1,6 @@
 ---
 name: ai-dev-standards
 description: Installs and maintains a layered AI development standards kit into a project repository — AGENTS.md entry, .agents/ task modules, commit-msg hook, CI self-check gate, and a self-check script. Use when the user asks to set up AI coding conventions for a project, initialize or adopt AGENTS.md, apply the same standards across multiple projects, or asks why a project has no AGENTS.md / .agents setup.
-agent_created: true
 ---
 
 # AI 开发规范（安装器）
@@ -13,6 +12,10 @@ agent_created: true
 规范化必须落地到项目根目录，才能被 Codex / Cursor / Claude Code 等工具读到——只在对话里讲规则是没用的。
 
 ## 获取
+
+**Claude Code 插件（推荐）**：装插件后执行 `/ai-dev-standards:install`，详见 [`references/claude-code.md`](references/claude-code.md)。
+
+**克隆后自己跑**：
 
 ```bash
 git clone https://github.com/999bug/ai-dev-standards.git
@@ -38,14 +41,18 @@ Windows：
 | 选项 | 作用 |
 | --- | --- |
 | （无） | `AGENTS.md` + `CLAUDE.md` + `.agents/` 11 个模块，并把 git 钩子装进 `.git/hooks/` |
-| `--with-check` | 加 `scripts/check.sh`（五项自检） |
+| `--with-check` | 加 `scripts/check.sh`（七项自检） |
 | `--with-ci` | 加 `.github/workflows/check.yml`，会自动带上 `check.sh` |
 | `--no-hooks` | 不装 git 钩子（默认是装的） |
+| `--shared-hooks` | 钩子装进项目里的 `.githooks/` 并设 `core.hooksPath`，跟仓库一起提交 |
+| `--upgrade` | 升级已装的规范：没改过的更新，改过的另存为 `.new` |
 | `--minimal` | 只装 `AGENTS.md` + `.agents/`，项目根只多 2 个条目 |
 | `--force` | 覆盖已存在文件（默认不覆盖，只跳过并报告） |
 | `--dry-run` | 只预览，不落盘 |
 
-**默认不覆盖已存在的文件**：目标项目可能已经改过 `AGENTS.md` 或某个模块，直接覆盖等于抹掉别人的工作。装过一次后再跑是幂等的（写入 0，全部跳过）。
+**默认不覆盖已存在的文件**：目标项目可能已经改过 `AGENTS.md` 或某个模块，直接覆盖等于抹掉别人的工作。装过一次后再跑不会重写任何东西（写入 0）。
+
+**升级用 `--upgrade`，不要用 `--force`**：安装器在 `.agents/.standards-version` 里记了每个文件的 sha256，hash 对得上才覆盖，对不上就写成 `<文件>.new`，你的改动不会丢。
 
 ## 安装后必做：填 profile
 
@@ -78,11 +85,13 @@ cd /path/to/your-project
 bash scripts/check.sh
 ```
 
-五项全绿：入口行数、明文邮箱、模块登记、交叉引用、代码块闭合。
+七项全绿：入口行数、明文邮箱、模块登记、交叉引用、代码块闭合、数字对账、插件清单。
 
 ## 安装后怎么用
 
-模块**不会自动加载**。每次开工第一句要显式说：
+模块**不会自动加载**。`AGENTS.md` 会被入口文件展开，`.agents/` 下的模块靠分流表按需读。
+
+装了 Claude Code 插件时，会话启动会自动输出一行提醒（`hooks/session-context.sh`，只读不写），不需要再手动说开场白。没装插件的项目仍然要显式说：
 
 > 先读 AGENTS.md 和 .agents/project-profile.md，再按分流表加载本项目需要的模块。
 
@@ -106,11 +115,15 @@ ai-dev-standards/
 │   ├── project-profile.md       项目事实（每个项目唯一要改的文件）
 │   ├── commit.md · discipline.md · integration.md · legacy.md · task-workflow.md
 │   └── lang-{java,python,vue}.md · release-{github,docker}.md
-├── scripts/check.sh             五项自检
+├── .claude-plugin/              插件与市场清单（版本号唯一来源）
+├── commands/                    插件命令：install · upgrade
+├── hooks/                       SessionStart 上下文提醒（只读）
+├── scripts/check.sh             七项自检
+├── scripts/release.sh           改版本 + 补 CHANGELOG + 跑自检 + 打 tag
 ├── templates/
 │   ├── githooks/                commit-msg · post-commit
 │   └── github/check.yml         CI 模板
-├── references/                  profile 填写 · 运作原理 · 扩展写法
+├── references/                  profile 填写 · 运作原理 · 扩展写法 · Claude Code 用法
 ├── install.sh / install.ps1     安装器
 └── reviews/                     待审批的经验提取报告
 ```
@@ -121,10 +134,11 @@ ai-dev-standards/
 | --- | --- |
 | `check.sh` 报"引用了不存在的文件" | 文档里写了不存在的 `.md` 文件名。改文件名或删引用，不要加白名单绕过 |
 | `check.sh` 报"模块没有登记" | 新增了 `.agents/*.md` 但没在 AGENTS.md 分流表登记 |
+| `check.sh` 报"文档里的数字过期" | 「N 个模块」「写入 N 个文件」和仓库实际不一致，按提示改成实际值 |
 | 提交被 `commit-msg` 拒绝 | 格式不符合 `.agents/commit.md`。类型是 `Doc` 不是 `DOC` |
 | AI 还是不看规范 | 开场没说加载，见上面「安装后怎么用」 |
-| 安装时大量文件被跳过 | 目标项目已装过。确认后用 `--force`，或只补缺失模块 |
+| 安装时大量文件被跳过 | 目标项目已装过。用 `--upgrade` 更新，或 `--force` 强制覆盖 |
 
 ## 许可
 
-[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)，可自由复制、修改、商用，需保留署名。全文见 `LICENSE`。
+文档 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)，脚本 MIT，见 `LICENSE` 与 `LICENSE-MIT`。
