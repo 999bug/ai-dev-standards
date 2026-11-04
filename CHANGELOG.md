@@ -3,6 +3,16 @@
 版本号是插件的更新依据：`plugin.json` 里的 `version` 不变，装了插件的用户就收不到新版。
 发版流程见 `scripts/release.sh`。
 
+## [1.8.1] - 2026-11-04
+
+### 修复
+
+- **没有 `pom.xml` / `build.gradle` 的 Java 项目识别不出来**（例如用 `build/build.sh` 打包的
+  老项目），安装时漏掉 `lang-java.md`。探测改为按源码后缀递归兜底：先扫常见源码目录，
+  扫不到就全仓库扫到 8 层，跳过 `.git` / `node_modules` / `build` / `target` / `dist` / `out`。
+  Java / Python / Vue 都适用，结构不规范（源码埋在 `module/src/main/java` 这种深路径）也能识别。
+- 顺带上报 `build/build.sh` 这类自带构建脚本的位置（`build_script`），供 profile 参考。
+
 ## [1.8.0] - 2026-11-04
 
 ### 新增

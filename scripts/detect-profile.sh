@@ -118,6 +118,33 @@ if have package.json; then
 fi
 have tsconfig.json && emit lang_typescript yes
 
+# 没有 pom / build.gradle 的 Java 项目很常见（脚本打包、老系统、外包代码库）。
+# 只看构建文件会把这类项目判成"没有语言"，进而漏装语言规范。
+# 目录结构不规范的（源码埋在 module/src/main/java 这种深路径）也要能扫到：
+# 先递归扫常见源码目录，扫不到再全仓库扫到 8 层，跳过构建产物与依赖目录。
+scan_source() {  # 扩展名
+    local n=0 d c
+    for d in src app lib packages cmd internal server module modules service services; do
+        [ -d "$d" ] || continue
+        c=$(find "$d" -type f -name "*.$1" 2>/dev/null | wc -l | tr -d ' ')
+        n=$((n + c))
+    done
+    if [ "$n" -eq 0 ]; then
+        n=$(find . -maxdepth 8 -type f -name "*.$1" \
+            -not -path './.git/*' -not -path './node_modules/*' \
+            -not -path './build/*' -not -path './target/*' \
+            -not -path './dist/*' -not -path './out/*' 2>/dev/null | wc -l | tr -d ' ')
+    fi
+    printf '%s' "$n"
+}
+
+java_files=$(scan_source java)
+[ "${java_files:-0}" -gt 0 ] && emit source_java_files "$java_files"
+py_files=$(scan_source py)
+[ "${py_files:-0}" -gt 0 ] && emit source_python_files "$py_files"
+vue_files=$(scan_source vue)
+[ "${vue_files:-0}" -gt 0 ] && emit source_vue_files "$vue_files"
+
 printf '\n# 四、包管理器（可能有多个，取主语言对应的那个）\n'
 pm=""
 add_pm() { case " $pm " in *" $1 "*) return 0 ;; esac; pm="${pm:+$pm }$1"; }
@@ -137,6 +164,10 @@ have build.gradle.kts && add_pm gradle
 emit package_managers "$pm"
 
 printf '\n# 五、命令（候选值，写进 profile 前必须实跑一次）\n'
+# 不用 Maven/Gradle 的项目常有自带的构建脚本，报告位置但不替用户决定怎么调
+[ -f build/build.sh ] && emit build_script "build/build.sh"
+[ -f build.sh ] && emit build_script "build.sh"
+[ -f scripts/build.sh ] && emit build_script "scripts/build.sh"
 build_cmd=""
 test_cmd=""
 dev_cmd=""

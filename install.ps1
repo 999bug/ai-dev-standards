@@ -283,10 +283,35 @@ else {
     $hasPython = (Test-Path (Join-Path $target 'pyproject.toml')) -or
         (Test-Path (Join-Path $target 'requirements.txt')) -or
         (Test-Path (Join-Path $target 'setup.py'))
-    $hasVue = $false
+
+    # 没有 pom / gradle 的 Java 项目很常见（脚本打包、老系统），按源码后缀兜底
+    function Test-SourceFiles {
+        param([string]$Extension)
+        foreach ($d in @('src', 'app', 'lib', 'packages', 'cmd', 'internal', 'server')) {
+            $dir = Join-Path $target $d
+            if (-not (Test-Path $dir)) { continue }
+            $hit = Get-ChildItem -Path $dir -Recurse -Filter "*.$Extension" -File -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+            if ($hit) { return $true }
+        }
+        # 结构不规范的仓库：源码可能埋在任意深度，扫到 8 层
+        $hit = Get-ChildItem -Path $target -Recurse -Depth 8 -Filter "*.$Extension" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\(\.git|node_modules|build|target|dist|out)\\' } |
+            Select-Object -First 1
+        return [bool]$hit
+    }
+
+    if (-not $hasJava) { $hasJava = Test-SourceFiles 'java' }
+    if (-not $hasPython) { $hasPython = Test-SourceFiles 'py' }
+    $hasVueByFile = Test-SourceFiles 'vue'
+
+    $hasVue = $hasVueByFile
     $pkgJson = Join-Path $target 'package.json'
     if (Test-Path $pkgJson) {
-        try { $hasVue = (Get-Content -Path $pkgJson -Raw) -match '"vue"' } catch { $hasVue = $false }
+        try {
+            if ((Get-Content -Path $pkgJson -Raw) -match '"vue"') { $hasVue = $true }
+        }
+        catch { }
     }
     $hasGithub = Test-Path (Join-Path $target '.github/workflows')
     if (-not $hasGithub) {

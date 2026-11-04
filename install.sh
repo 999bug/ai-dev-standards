@@ -159,14 +159,17 @@ set_field() {  # file key value
 }
 
 # 语言块里的示例行要么启用成实际值，要么注释掉——留着示例值会被当成项目事实
-set_lang() {  # file key value
-    local p="$1" k="$2" v="$3"
+set_lang() {  # file key value [present]
+    local p="$1" k="$2" v="$3" present="${4:-0}"
     if [ -n "$v" ]; then
         awk -v k="$k" -v v="$v" '
             $0 ~ ("^  # " k ":") { print "  " k ": " v; next }
             { print }
         ' "$p" > "$p.seed" && mv "$p.seed" "$p"
         set_field "$p" "  $k" "$v"
+    elif [ "$present" = "1" ]; then
+        # 是这门语言，但版本没读到：保留「未定」让人填，别注释掉
+        return 0
     else
         awk -v k="$k" '
             $0 ~ ("^  " k ":") { print "  # " substr($0, 3); next }
@@ -198,9 +201,9 @@ seed_profile() {
     [ -n "$v" ] || v=$(fact python_description); [ -n "$v" ] || v=$(fact readme_first_line)
     set_field "$p" description "$v"
 
-    set_lang "$p" java "$(fact lang_java)"
-    set_lang "$p" python "$(fact lang_python)"
-    set_lang "$p" vue "$(fact lang_vue)"
+    set_lang "$p" java "$(fact lang_java)" "$(has_fact source_java_files && echo 1 || echo 0)"
+    set_lang "$p" python "$(fact lang_python)" "$(has_fact source_python_files && echo 1 || echo 0)"
+    set_lang "$p" vue "$(fact lang_vue)" "$(has_fact source_vue_files && echo 1 || echo 0)"
 
     set_field "$p" framework "$(fact framework)"
     set_field "$p" package_manager "$(printf '%s' "$(fact package_managers)" | awk '{print $1}')"
@@ -280,9 +283,15 @@ elif [ -n "$only_modules" ]; then
     done
 else
     for m in $ALWAYS_MODULES; do add_wanted "$m"; done
-    has_fact lang_java   && add_wanted lang-java.md
-    has_fact lang_python && add_wanted lang-python.md
-    has_fact lang_vue    && add_wanted lang-vue.md
+    if has_fact lang_java || has_fact source_java_files; then
+        add_wanted lang-java.md
+    fi
+    if has_fact lang_python || has_fact source_python_files; then
+        add_wanted lang-python.md
+    fi
+    if has_fact lang_vue || has_fact source_vue_files; then
+        add_wanted lang-vue.md
+    fi
     if has_fact workflow || printf '%s\n' "$facts" | grep -q '^git_remote=.*github'; then
         add_wanted release-github.md
     fi
