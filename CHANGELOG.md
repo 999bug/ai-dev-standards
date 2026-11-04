@@ -3,6 +3,22 @@
 版本号是插件的更新依据：`plugin.json` 里的 `version` 不变，装了插件的用户就收不到新版。
 发版流程见 `scripts/release.sh`。
 
+## [1.7.0] - 2026-11-04
+
+### 新增
+
+- **安装器按项目裁剪模块**：语言模块只在探测到该语言时装（`pom.xml` → Java、
+  `pyproject.toml` → Python、`package.json` + `vue` → Vue），`release-github` 只在用了
+  GitHub（workflows 或 github remote）时装，`release-docker` 只在有 `Dockerfile`/`compose` 时装。
+  `AGENTS.md` 的分流表会同步删掉未装模块的行，不留悬空引用。
+- `--all-modules` / `-AllModules` 保留旧的全量行为；`--modules=a,b` 手动指定。
+- 安装汇总增加「模块：N/11（与项目无关，跳过 …）」，dry-run 也能看到裁剪结果。
+
+### 变更
+
+- 纯 Java 项目从 15 个文件降到 11 个（7 个模块）；前端 + GitHub + Docker 为 13 个。
+- 裁剪判断复用 `scripts/detect-profile.sh`，安装器和 profile 生成不再各判断一套。
+
 ## [1.6.0] - 2026-11-04
 
 ### 新增

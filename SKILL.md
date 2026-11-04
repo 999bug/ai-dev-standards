@@ -40,15 +40,19 @@ Windows：
 
 | 选项 | 作用 |
 | --- | --- |
-| （无） | `AGENTS.md` + `CLAUDE.md` + `.agents/` 11 个模块，并把 git 钩子装进 `.git/hooks/` |
+| （无） | `AGENTS.md` + `CLAUDE.md` + **与项目相关**的 `.agents/` 模块，并把 git 钩子装进 `.git/hooks/` |
 | `--with-check` | 加 `scripts/check.sh`（七项自检） |
 | `--with-ci` | 加 `.github/workflows/check.yml`，会自动带上 `check.sh` |
 | `--no-hooks` | 不装 git 钩子（默认是装的） |
 | `--shared-hooks` | 钩子装进项目里的 `.githooks/` 并设 `core.hooksPath`，跟仓库一起提交 |
 | `--upgrade` | 升级已装的规范：没改过的更新，改过的另存为 `.new` |
+| `--all-modules` | 不裁剪，`.agents/` 下 11 个模块全装（旧行为） |
+| `--modules=a,b` | 只装指定模块，例如 `--modules=commit.md,lang-java.md` |
 | `--minimal` | 只装 `AGENTS.md` + `.agents/`，项目根只多 2 个条目 |
 | `--force` | 覆盖已存在文件（默认不覆盖，只跳过并报告） |
 | `--dry-run` | 只预览，不落盘 |
+
+**模块按项目裁剪**（默认）：`pom.xml`/`build.gradle` → 只装 Java，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范。跨语言的项目档案、提交、纪律、任务工作流、外部对接、老系统方法论始终装。`AGENTS.md` 的分流表会同步删掉未装模块的行，不留悬空引用。
 
 **默认不覆盖已存在的文件**：目标项目可能已经改过 `AGENTS.md` 或某个模块，直接覆盖等于抹掉别人的工作。装过一次后再跑不会重写任何东西（写入 0）。
 

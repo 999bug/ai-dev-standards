@@ -1,6 +1,6 @@
 # AI 开发规范
 
-装进项目就能生效的一套分层开发规范：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 11 个模块，可选提交门禁与 CI 自检。目标是让 AI 按你的意图改代码，而不是按它的默认习惯。
+装进项目就能生效的一套分层开发规范：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 有 11 个模块（安装时按项目裁剪），可选提交门禁与 CI 自检。目标是让 AI 按你的意图改代码，而不是按它的默认习惯。
 
 装完一个项目只多 3 个条目：`AGENTS.md`、`.agents/`、`CLAUDE.md`。钩子进 `.git/hooks/`，不占根目录。
 
@@ -23,13 +23,20 @@ claude plugin install ai-dev-standards@ai-dev-standards --scope local
 /ai-dev-standards:install
 ```
 
-它会先跑 `--dry-run` 把「要写哪些文件、跳过哪些」摆给你看，确认后才落盘。默认级别＝规范文件 + `CLAUDE.md` + `.git/hooks/` 下的两个钩子。装完输出：
+它会先跑 `--dry-run` 把「要写哪些文件、跳过哪些」摆给你看，确认后才落盘。默认级别＝**与项目相关的规范模块** + `CLAUDE.md` + `.git/hooks/` 下的两个钩子。
 
-```text
-写入 15 个文件，更新 0 个，跳过 0 个已存在的文件
-```
+模块按项目裁剪，不会把无关规范塞进来：
 
-要 CI 或自检脚本，跟它说一声加上 `--with-ci` / `--with-check`。
+| 项目情况 | 装什么 |
+| --- | --- |
+| 纯 Java、没用 GitHub、没有 Docker | 模块 7 个 · 文件 11 个 |
+| Java + GitHub Actions + Dockerfile | 模块 9 个 · 文件 13 个 |
+| 前端 Vue + GitHub + Docker | 模块 9 个 · 文件 13 个 |
+| 要全量（旧行为） | `--all-modules`，写入 15 个文件 |
+
+判断依据直接复用 profile 的探测脚本：`pom.xml`/`build.gradle` → 只装 Java 规范，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范。**`AGENTS.md` 的分流表会同步删掉未装模块的行**，不会留悬空引用。
+
+要 CI 或自检脚本，跟它说一声加上 `--with-ci` / `--with-check`；想手工指定模块用 `--modules=commit.md,lang-java.md`。
 
 Windows 上没有 `bash` 也不要紧：命令会自动改用 `install.ps1`，效果一样。
 

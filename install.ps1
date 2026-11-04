@@ -32,6 +32,12 @@
     升级已装的规范：按 .agents/.standards-version 里的 sha256 判断文件是否被本地改过。
     没改过的覆盖为新版，改过的另存为 <文件>.new。
 
+.PARAMETER AllModules
+    不裁剪，.agents/ 下的模块全装（旧行为）。
+
+.PARAMETER Modules
+    只装指定模块，如 -Modules commit.md,lang-java.md。
+
 .PARAMETER SharedHooks
     钩子写进项目的 .githooks/ 并设置 core.hooksPath，跟仓库一起提交，团队 clone 后直接生效。
 
@@ -59,6 +65,8 @@ param(
     [switch]$WithCi,
     [switch]$WithHooks,
     [switch]$Upgrade,
+    [switch]$AllModules,
+    [string[]]$Modules,
     [switch]$SharedHooks,
     [switch]$Force,
     [switch]$DryRun
@@ -236,16 +244,89 @@ function Write-Manifest {
     }
 }
 
+# ---------- 模块裁剪：只装和这个项目有关的规范 ----------
+# 跨语言、任何项目都用得上：项目档案、提交规范、纪律、任务工作流、外部对接、老系统方法论
+$alwaysModules = @('project-profile.md', 'commit.md', 'discipline.md', 'task-workflow.md', 'integration.md', 'legacy.md')
+$allModuleFiles = @(Get-ChildItem -Path (Join-Path $repoRoot '.agents') -Filter '*.md' -File | ForEach-Object { $_.Name })
+
+$wanted = @()
+if ($AllModules) {
+    $wanted = $allModuleFiles
+}
+elseif ($Modules) {
+    foreach ($item in $Modules) {
+        foreach ($piece in ($item -split ',')) {
+            $name = $piece.Trim()
+            if (-not $name) { continue }
+            if ($allModuleFiles -notcontains $name) {
+                throw "未知模块: $name（可用模块见 .agents/ 目录）"
+            }
+            if ($wanted -notcontains $name) { $wanted += $name }
+        }
+    }
+}
+else {
+    $wanted = @($alwaysModules)
+
+    $hasJava = (Test-Path (Join-Path $target 'pom.xml')) -or
+        (Test-Path (Join-Path $target 'build.gradle')) -or
+        (Test-Path (Join-Path $target 'build.gradle.kts'))
+    $hasPython = (Test-Path (Join-Path $target 'pyproject.toml')) -or
+        (Test-Path (Join-Path $target 'requirements.txt')) -or
+        (Test-Path (Join-Path $target 'setup.py'))
+    $hasVue = $false
+    $pkgJson = Join-Path $target 'package.json'
+    if (Test-Path $pkgJson) {
+        try { $hasVue = (Get-Content -Path $pkgJson -Raw) -match '"vue"' } catch { $hasVue = $false }
+    }
+    $hasGithub = Test-Path (Join-Path $target '.github/workflows')
+    if (-not $hasGithub) {
+        try {
+            $remote = & git -C $target remote get-url origin 2>$null
+            if ($remote -match 'github') { $hasGithub = $true }
+        }
+        catch { $hasGithub = $false }
+    }
+    $hasDocker = (Test-Path (Join-Path $target 'Dockerfile')) -or
+        (Test-Path (Join-Path $target 'docker-compose.yml')) -or
+        (Test-Path (Join-Path $target 'compose.yaml'))
+
+    if ($hasJava) { $wanted += 'lang-java.md' }
+    if ($hasPython) { $wanted += 'lang-python.md' }
+    if ($hasVue) { $wanted += 'lang-vue.md' }
+    if ($hasGithub) { $wanted += 'release-github.md' }
+    if ($hasDocker) { $wanted += 'release-docker.md' }
+}
+
+$skippedModules = @($allModuleFiles | Where-Object { $wanted -notcontains $_ })
+
+# 没装的模块不能留在 AGENTS.md 的分流表里，否则 AI 会照表去读不存在的文件
+$agentsSource = Join-Path $repoRoot 'AGENTS.md'
+$agentsTemp = $null
+if ($skippedModules.Count -gt 0) {
+    $lines = Get-Content -Path $agentsSource
+    $tick = [char]96
+    foreach ($m in $skippedModules) {
+        $pattern = '^\|.*' + $tick + [regex]::Escape($m) + $tick
+        $lines = $lines | Where-Object { $_ -notmatch $pattern }
+    }
+    $agentsTemp = [System.IO.Path]::GetTempFileName()
+    Set-Content -Path $agentsTemp -Value $lines -Encoding utf8
+    $agentsSource = $agentsTemp
+}
+
 Write-Host "模板来源: $repoRoot"
 Write-Host "目标项目: $target"
 Write-Host "规范版本: $version"
 Write-Host ''
 
 Write-Host '1. 核心规范'
-Write-File (Join-Path $repoRoot 'AGENTS.md') (Join-Path $target 'AGENTS.md')
+Write-File $agentsSource (Join-Path $target 'AGENTS.md')
+if ($agentsTemp -and (Test-Path $agentsTemp)) { Remove-Item -Path $agentsTemp -Force -ErrorAction SilentlyContinue }
 
 $agentDir = Join-Path $repoRoot '.agents'
 foreach ($f in Get-ChildItem -Path $agentDir -Filter '*.md' -File) {
+    if ($wanted -notcontains $f.Name) { continue }
     Write-File $f.FullName (Join-Path $target ".agents/$($f.Name)")
 }
 
@@ -377,6 +458,9 @@ Write-Manifest
 Write-Host ''
 Write-Host '────────────────────────────'
 Write-Host "写入 $script:created 个文件，更新 $script:updated 个，跳过 $script:skipped 个已存在的文件"
+$skipNote = ''
+if ($skippedModules.Count -gt 0) { $skipNote = "（与项目无关，跳过 $($skippedModules -join ' ')）" }
+Write-Host "模块：$($wanted.Count)/$($allModuleFiles.Count)$skipNote"
 if ((-not $DryRun) -and (Test-Path $manifestPath)) {
     Write-Host "安装清单: .agents/.standards-version（version=$version）"
 }

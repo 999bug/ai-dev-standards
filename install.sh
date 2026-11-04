@@ -17,10 +17,20 @@
 #                   因为 CI 里跑的就是那个脚本
 #   --upgrade       升级已装的规范：只覆盖「装完之后没被改过」的文件，
 #                   改过的另存为 <文件>.new，不动你的修改
+#   --all-modules   不裁剪，.agents/ 下的模块全装（旧行为）
+#   --modules=a,b   只装指定的模块（文件名，不带路径），如 --modules=commit.md,lang-java.md
 #   --shared-hooks  钩子写进项目的 .githooks/ 并设置 core.hooksPath，
 #                   这样钩子跟仓库一起提交，团队 clone 后直接生效
 #   --force         覆盖已存在的文件（危险，先确认）
 #   --dry-run       只打印将要做什么，不落盘
+#
+# 默认按项目裁剪模块（不用 --all-modules 时）：
+#   - lang-java / lang-python / lang-vue 只在探测到对应语言时装
+#   - release-github 只在用了 GitHub（workflows 或 github remote）时装
+#   - release-docker 只在有 Dockerfile / compose 时装
+#   跨语言的四件（project-profile、commit、discipline、task-workflow）和方法论两件
+#   （integration、legacy）始终装。AGENTS.md 的分流表会同步删掉未装模块的行，
+#   不留悬空引用。
 #
 # 钩子默认装到 .git/hooks/（git 默认位置），不占项目根目录条目，也不需要
 # core.hooksPath。代价是它不进版本控制：别人 clone 后要各自装一次。
@@ -59,6 +69,8 @@ minimal=0
 force=0
 dry=0
 upgrade=0
+all_modules=0
+only_modules=""
 hooks_mode="local"    # local = .git/hooks/；shared = .githooks/ + core.hooksPath
 
 for arg in "$@"; do
@@ -69,6 +81,8 @@ for arg in "$@"; do
         --with-check)   with_check=1 ;;
         --with-ci)      with_ci=1 ;;
         --upgrade)      upgrade=1 ;;
+        --all-modules)  all_modules=1 ;;
+        --modules=*)    only_modules="${arg#--modules=}" ;;
         --shared-hooks) hooks_mode="shared" ;;
         --force)        force=1 ;;
         --dry-run)      dry=1 ;;
@@ -112,6 +126,71 @@ VERSION=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
 [ -n "$VERSION" ] || VERSION="unknown"
 
 manifest="$target/.agents/.standards-version"
+
+# ---------- 模块裁剪：只装和这个项目有关的规范 ----------
+# 跨语言、任何项目都用得上：项目档案、提交规范、纪律、任务工作流、外部对接、老系统方法论
+ALWAYS_MODULES="project-profile.md commit.md discipline.md task-workflow.md integration.md legacy.md"
+
+wanted=""
+add_wanted() {
+    case " $wanted " in *" $1 "*) return 0 ;; esac
+    wanted="${wanted:+$wanted }$1"
+}
+is_wanted() {
+    case " $wanted " in *" $1 "*) return 0 ;; *) return 1 ;; esac
+}
+
+# 复用 profile 的探测脚本，避免安装器和 /ai-dev-standards:profile 各判断一套
+facts=""
+if [ -f "$REPO_ROOT/scripts/detect-profile.sh" ]; then
+    facts=$(bash "$REPO_ROOT/scripts/detect-profile.sh" "$target" 2>/dev/null)
+fi
+has_fact() { printf '%s\n' "$facts" | grep -q "^$1="; }
+
+if [ "$all_modules" -eq 1 ]; then
+    for f in "$REPO_ROOT"/.agents/*.md; do
+        [ -e "$f" ] && add_wanted "$(basename "$f")"
+    done
+elif [ -n "$only_modules" ]; then
+    for m in $(printf '%s' "$only_modules" | tr ',' ' '); do
+        if [ ! -f "$REPO_ROOT/.agents/$m" ]; then
+            echo "未知模块: $m（可用模块见 .agents/ 目录）" >&2
+            exit 2
+        fi
+        add_wanted "$m"
+    done
+else
+    for m in $ALWAYS_MODULES; do add_wanted "$m"; done
+    has_fact lang_java   && add_wanted lang-java.md
+    has_fact lang_python && add_wanted lang-python.md
+    has_fact lang_vue    && add_wanted lang-vue.md
+    if has_fact workflow || printf '%s\n' "$facts" | grep -q '^git_remote=.*github'; then
+        add_wanted release-github.md
+    fi
+    if has_fact has_dockerfile || printf '%s\n' "$facts" | grep -q '^deploy_target=docker-compose'; then
+        add_wanted release-docker.md
+    fi
+fi
+
+skipped_modules=""
+for f in "$REPO_ROOT"/.agents/*.md; do
+    [ -e "$f" ] || continue
+    base=$(basename "$f")
+    is_wanted "$base" || skipped_modules="$skipped_modules $base"
+done
+
+# 没装的模块不能留在 AGENTS.md 的分流表里，否则 AI 会照表去读不存在的文件
+tmpdir=$(mktemp -d 2>/dev/null)
+agents_src="$REPO_ROOT/AGENTS.md"
+if [ -n "${tmpdir:-}" ] && [ -n "$skipped_modules" ]; then
+    cp "$REPO_ROOT/AGENTS.md" "$tmpdir/AGENTS.md"
+    for bad in $skipped_modules; do
+        # 只删表格行里点名该文件的行，正文里的引用保持原样
+        grep -vE "^\|.*\`${bad}\`" "$tmpdir/AGENTS.md" > "$tmpdir/next" 2>/dev/null || true
+        mv "$tmpdir/next" "$tmpdir/AGENTS.md"
+    done
+    agents_src="$tmpdir/AGENTS.md"
+fi
 
 new_count=0
 upd_count=0
@@ -222,9 +301,10 @@ log ""
 
 # ---------- 核心：AGENTS.md + .agents/ ----------
 log "1. 核心规范"
-put "$REPO_ROOT/AGENTS.md" "$target/AGENTS.md"
+put "$agents_src" "$target/AGENTS.md"
 for f in "$REPO_ROOT"/.agents/*.md; do
     [ -e "$f" ] || continue
+    is_wanted "$(basename "$f")" || continue
     put "$f" "$target/.agents/$(basename "$f")"
 done
 
@@ -378,6 +458,7 @@ write_manifest
 log ""
 log "────────────────────────────"
 log "写入 $new_count 个文件，更新 $upd_count 个，跳过 $skip_count 个已存在的文件"
+log "模块：$(printf '%s\n' $wanted | wc -l | tr -d ' ')/11$([ -n "$skipped_modules" ] && printf '（与项目无关，跳过%s）' "$skipped_modules")"
 [ "$dry" -eq 0 ] && [ -f "$manifest" ] && log "安装清单: .agents/.standards-version（version=$VERSION）"
 
 if [ "$conflict_count" -gt 0 ]; then
@@ -406,4 +487,10 @@ if [ "$dry" -eq 0 ]; then
         log ""
         log "验证安装：cd \"$target\" && bash scripts/check.sh"
     fi
+fi
+
+# 裁剪 AGENTS.md 用的临时目录
+if [ -n "${tmpdir:-}" ]; then
+    rm -f "$tmpdir/AGENTS.md" "$tmpdir/next" 2>/dev/null
+    rmdir "$tmpdir" 2>/dev/null || true
 fi

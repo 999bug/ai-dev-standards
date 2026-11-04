@@ -65,15 +65,30 @@ chmod +x install.sh
 
 | 选项（sh / ps1） | 装什么 | 项目根新增 |
 | --- | --- | --- |
-| 默认 | 入口 + 11 个模块 + `CLAUDE.md`，并把钩子装进 `.git/hooks/` | 3 个 |
+| 默认 | 入口 + 与项目相关的模块（按语言/平台裁剪）+ `CLAUDE.md`，钩子进 `.git/hooks/` | 3 个 |
 | `--no-hooks` / `-NoHooks` | 同上，但不装钩子 | 3 个 |
 | `--with-check` / `-WithCheck` | 再加 `scripts/check.sh`（七项自检） | 4 个 |
 | `--with-ci` / `-WithCi` | 再加 `.github/workflows/check.yml`；会自动带上 `check.sh` | 5 个 |
 | `--shared-hooks` / `-SharedHooks` | 钩子改写进项目里的 `.githooks/`，并设 `core.hooksPath` | 4 个 |
+| `--all-modules` / `-AllModules` | 不裁剪，全部模块都装 | 3 个 |
+| `--modules=a,b` / `-Modules` | 只装指定模块 | 3 个 |
 | `--minimal` / `-Minimal` | 只装 `AGENTS.md` + `.agents/`，也不装钩子 | 2 个 |
 | `--upgrade` / `-Upgrade` | 升级：没改过的更新，改过的另存 `.new` | — |
 | `--force` / `-Force` | 覆盖已存在文件 | — |
 | `--dry-run` / `-DryRun` | 只预览，不落盘 | — |
+
+**默认按项目裁剪模块**，不把无关规范塞进来：
+
+| 项目 | 装几个模块 |
+| --- | --- |
+| 纯 Java、无 GitHub、无 Docker | 7 |
+| Java + GitHub Actions + Dockerfile | 9 |
+| 前端 Vue + GitHub + Docker | 9 |
+| 全量（`--all-modules`） | 11 |
+
+判断依据是文件存在性：`pom.xml`/`build.gradle` → Java，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范。跨语言的项目档案、提交、纪律、任务工作流、外部对接、老系统方法论始终装。
+
+`AGENTS.md` 的分流表会同步删掉未装模块的行——否则 AI 会照表去读不存在的文件。
 
 **钩子默认就装**，位置是 `.git/hooks/`，不占项目根目录、也不需要配 `core.hooksPath`。代价是它不进版本控制，别人 clone 后要各自装一次。想让门禁跟着仓库走、团队 clone 后直接生效，用 `--shared-hooks`：钩子写进 `.githooks/`，并执行 `git config core.hooksPath .githooks`（这条会改项目的 git 配置，所以不默认做）。
 
@@ -180,6 +195,8 @@ git pull
 有 `.new` 就逐个 diff 合并，然后删掉 `.new`。**不要图省事改用 `--force`**——那会把你的所有本地改动一起盖掉。
 
 从 1.4.0 及更早版本升上来的项目没有安装清单，`--upgrade` 会把所有内容不同的文件都当成冲突（因为没有依据判断谁改过）。这种情况先跑一次普通安装（`./install.sh <目标>`）补齐清单，之后升级就正常了。
+
+注意：裁剪规则变了（比如项目删掉了 Dockerfile）**不会删除已装的模块**，只是不再更新它。确认不需要时手动删 `.agents/` 下对应文件，并从 `AGENTS.md` 分流表里去掉那一行。
 
 ## 卸载与清理
 
