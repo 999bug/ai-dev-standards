@@ -176,7 +176,7 @@ bash scripts/check.sh
 | `.agents/integration.md` | 对接外部系统、调 SDK | HTTP 200 陷阱、签名与编码、时间戳单位、断线缓冲 |
 | `.agents/legacy.md` | 接手老项目、重构巨型类 | 体检 grep、找接缝、迁移只搬不改、验收清单 |
 | `.agents/task-workflow.md` | 跨多次会话、要拆子任务、接手半成品 | 何时写 spec/plan、模板、台账与交接、子代理任务书与报告 |
-| `.agents/lang-*.md` | 改对应语言时 | Java / Python / Vue 各自的坑，通用纪律不重复 |
+| `.agents/lang-*.md` | 改对应语言时 | Java（版本特性、导入与命名、并发、超时、缓存）/ Python / Vue 的坑，通用纪律不重复 |
 | `.agents/release-*.md` | 发版、改镜像 | GitHub Actions 与 Docker 的发布、回滚 |
 | `CLAUDE.md` | Claude Code 会话 | 一行 `@AGENTS.md`，让只认 CLAUDE.md 的工具读到同一份规范 |
 | `.agents/.standards-version` | 升级时 | 版本与每个文件的 sha256，`--upgrade` 据此保留你的改动 |
