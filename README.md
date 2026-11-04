@@ -67,6 +67,12 @@ claude plugin marketplace remove ai-dev-standards
 
 卸载只删插件，**已经写进项目的文件不会自动消失**。删哪些、怎么删见 [docs/manual-install.md](docs/manual-install.md#卸载与清理)。
 
+### 想自己发布插件
+
+插件的生成、发布、别人怎么找到、以及各种装不上的排错，单独写了一份：
+
+**→ [docs/plugin-publishing.md](docs/plugin-publishing.md)**
+
 ## 装完之后
 
 ### 1. 必改：`.agents/project-profile.md`

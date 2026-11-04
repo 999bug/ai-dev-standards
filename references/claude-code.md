@@ -65,6 +65,8 @@ bash scripts/release.sh 1.6.0
 
 `claude plugin tag` 是官方命令，会校验 `plugin.json` 与 marketplace 条目里的版本一致，再打 `{name}--v{version}` 的 tag。`check.sh` 第 7 项会在版本与 CHANGELOG 不一致时直接失败，所以忘了 bump 在本地就会被拦。
 
+完整流程（目录结构、市场清单字段、别人怎么找到、装不上的排错）见 [`../docs/plugin-publishing.md`](../docs/plugin-publishing.md)。
+
 如果想进 Anthropic 官方目录（`claude.ai` 和 Cowork 里能搜到），要从 `claude.ai/directory/manage` 提交，需要付费的 claude.ai 计划。官方市场 `claude-plugins-official` 不接受门户提交，只能通过 Anthropic 的合作伙伴渠道谈。目录要求一个 512–2048 px 的方形 PNG 图标，放在 `.claude-plugin/icon.png`。
 
 ## 方式二：克隆后自己跑安装器
