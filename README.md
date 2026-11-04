@@ -82,19 +82,26 @@ claude plugin marketplace remove ai-dev-standards
 
 ## 装完之后
 
-### 1. 一键生成 `.agents/project-profile.md`
+### 1. `.agents/project-profile.md` 已经帮你填好了
 
-安装命令结束时会直接进入这一步；想单独跑也行：
+首次安装时，安装器会用 `scripts/detect-profile.sh` 探测构建/测试命令、语言版本、部署目标、提交风格、目录结构，直接写进 profile 初稿。装完只需要补三样：
+
+- `type` / `visibility`：开源还是公司项目（只有你知道）
+- `verify_*`：构建/测试命令要不要现在实跑一遍
+- 探测不到的项目特有信息
+
+想补齐就跑：
 
 ```text
 /ai-dev-standards:profile
 ```
 
-`scripts/detect-profile.sh` 先探测构建/测试命令、语言版本、部署目标、提交风格、目录结构，然后只问你四个必须由人决定的选择——仓库性质（开源 / 个人私有 / 公司内部）、提交信息风格、推送策略、要不要现在跑验证。其余字段自动写进去。
+它只问四个必须由人决定的选择——仓库性质（开源 / 个人私有 / 公司内部）、提交信息风格、推送策略、要不要现在跑验证。
 
-探测不到的会留「未定」并列成清单，不会拿示例值糊弄你。**这份 profile 是整套体系能否生效的关键**：不填，AI 会拿示例值当项目事实，然后一路错下去。字段说明与常见错误见 [`references/profile-guide.md`](references/profile-guide.md)。
+**升级不会改这个文件。** 里面是项目事实和你手写的结论，模板更新不该覆盖它；需要按新模板重整时，手动跑上面那条命令。
 
-也可以手填，或让 AI 按指南里的「自动生成」映射表从 `/init` 产物出初稿——但没必要，探测比手抄准。
+探测不到的会留「未定」并列成清单，不会拿示例值糊弄你。字段说明见 [`references/profile-guide.md`](references/profile-guide.md)。
+
 
 
 ### 2. 不用再背那句开场白了

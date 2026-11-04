@@ -4,22 +4,16 @@ profile 是整套体系里唯一需要按项目改的文件。它不描述"规�
 
 ## 一键生成（默认做法）
 
-不要让人对着 28 个「未定」逐项查。标准流程是让 AI 跑一遍：
+不要让人对着「未定」逐项查。分两步，安装时自动完成第一步：
 
-```
-/ai-dev-standards:profile
-```
-
-四步：
-
-1. **脚本探测**：`scripts/detect-profile.sh` 读 `package.json` / `pom.xml` / `pyproject.toml` / 锁文件 / `Dockerfile` / workflows / `git log`，输出 `key=value`。同一份事实每次结果一致，不靠模型猜。
-2. **补读**：README 第一段、目录结构、项目自有文档。
-3. **只问 4 个问题**（弹选项，不要求打字）：
-   - 仓库性质：GitHub 开源 / 个人私有 / 公司内部 → 决定 `type`、`visibility`、邮箱策略
+1. **安装器自动填初稿**：首次 `install.sh` 会用 `scripts/detect-profile.sh` 读 `package.json` / `pom.xml` / `pyproject.toml` / 锁文件 / `Dockerfile` / workflows / `git log`，把项目名、描述、语言版本、包管理器、构建/测试命令、框架、提交风格、部署目标、registry 直接写进 `.agents/project-profile.md`。同一份事实每次结果一致，不靠模型猜。
+2. **`/ai-dev-standards:profile` 补齐**：只问 4 个必须由人决定的问题——
+   - 仓库性质：GitHub 开源 / 个人私有 / 公司内部 → `type`、`visibility`、邮箱策略
    - 提交风格：`[NF]` 前缀 / Conventional / 沿用现状 → `commit_style`
    - 推送策略：只提交 / 允许自动推 / 从不推 → `push_policy`
    - 验证命令现在跑不跑 → `verify_*` 可不可信
-4. **写文件 + 实跑验证**：探测到的值直接写；跑不通的命令不写进 profile，留「未定」并记进 §9。
+
+**升级不改 profile。** `--upgrade` 会跳过 `.agents/project-profile.md`：里面是项目事实和你手写的结论，模板更新不该覆盖。要按新模板重整时手动跑 `/ai-dev-standards:profile`。
 
 **只有人才能决定的事才问**。语言版本、构建命令、部署目标这些问人不如读文件准。
 
@@ -90,8 +84,6 @@ profile 是整套体系里唯一需要按项目改的文件。它不描述"规�
 - 语义化 `vMAJOR.MINOR.PATCH`：对外发布
 - 日期 `yyyy.mm.dd`：数据/内容类项目
 
-`domestic_mirror`：国内机器拉 `ghcr.io` 常常超时，oss 项目默认配阿里云 ACR。
-
 ### 第 5 节 敏感信息
 
 `never_commit` 只写**项目特有**的项。`.env`、`token`、`node_modules` 这些通用项已经在 `.agents/discipline.md` 里了，不用重复。
@@ -127,7 +119,8 @@ profile 是整套体系里唯一需要按项目改的文件。它不描述"规�
 
 ### 第 10 节 项目详细档案
 
-从 `/init` 产物抽取的原文归档区，不是必填节。抽取规则见模板 §10 的三条；最容易犯的错是只搬正文不填 §1–§9——档案是依据，不是替代品。
+可选节，缺省就删掉。需要时把项目原有 `CLAUDE.md` / `AGENTS.md` 的正文按标题降一级追加到这里。
+最容易犯的错是只搬正文不填 §1–§9——档案是依据，不是替代品。
 
 ## 三条红线
 

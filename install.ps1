@@ -113,6 +113,7 @@ $script:created = 0
 $script:updated = 0
 $script:skipped = 0
 $script:conflicts = 0
+$script:profileKept = $false
 $script:skipList = [System.Collections.Generic.List[string]]::new()
 $script:conflictList = [System.Collections.Generic.List[string]]::new()
 $script:managed = [System.Collections.Generic.List[string]]::new()
@@ -152,6 +153,14 @@ function Write-File {
     param([string]$Source, [string]$Destination)
 
     $rel = Get-RelPath $Destination
+
+    # 升级不动项目档案：里面是项目事实和你手填的结论，模板更新不该覆盖它
+    if ($Upgrade -and $rel -eq '.agents/project-profile.md' -and (Test-Path $Destination)) {
+        $script:profileKept = $true
+        $script:skipped++
+        $script:managed.Add($rel)
+        return
+    }
 
     # 目标不存在：新增
     if (-not (Test-Path $Destination)) {
@@ -461,6 +470,9 @@ Write-Host "写入 $script:created 个文件，更新 $script:updated 个，跳�
 $skipNote = ''
 if ($skippedModules.Count -gt 0) { $skipNote = "（与项目无关，跳过 $($skippedModules -join ' ')）" }
 Write-Host "模块：$($wanted.Count)/$($allModuleFiles.Count)$skipNote"
+if ($script:profileKept) {
+    Write-Host '项目档案未改动：升级不改 .agents/project-profile.md（要重整跑 /ai-dev-standards:profile）'
+}
 if ((-not $DryRun) -and (Test-Path $manifestPath)) {
     Write-Host "安装清单: .agents/.standards-version（version=$version）"
 }
@@ -480,7 +492,7 @@ if ($script:skipList.Count -gt 0) {
     Write-Host '只是版本旧了用 -Upgrade；确认要以模板为准请加 -Force 重跑。'
 }
 
-if (-not $DryRun) {
+if ((-not $DryRun) -and (-not $script:profileKept)) {
     Write-Host ''
     Write-Host '下一步（必须）：生成 .agents/project-profile.md'
     Write-Host '  文件里全是「未定」。别手填——装过插件的话跑：/ai-dev-standards:profile'

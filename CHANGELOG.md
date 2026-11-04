@@ -3,6 +3,23 @@
 版本号是插件的更新依据：`plugin.json` 里的 `version` 不变，装了插件的用户就收不到新版。
 发版流程见 `scripts/release.sh`。
 
+## [1.8.0] - 2026-11-04
+
+### 新增
+
+- **首次安装按探测结果自动填 profile 初稿**：安装器把项目名、描述、语言版本、包管理器、
+  构建/测试/启动命令、框架、提交风格、部署目标、registry、敏感信息位置直接写进
+  `.agents/project-profile.md`，剩下 `type` / `visibility` / `verify_*` 才需要人确认。
+
+### 变更
+
+- `project-profile.md` 模板精简：去掉 `domestic_mirror`、`release_assets`、`retention`、
+  `verify_smoke` / `verify_version` / `verify_ui` 等低频字段，语言块按实际探测结果启用或
+  注释掉示例行，避免示例值被当成项目事实。
+- `--upgrade` / `-Upgrade` 不再改动 `.agents/project-profile.md`（sh 与 ps1 同步）：
+  升级只更新规范，项目档案和手写结论保持原样；要按新模板重整就手动跑
+  `/ai-dev-standards:profile`。汇总里会明确提示这一点。
+
 ## [1.7.0] - 2026-11-04
 
 ### 新增

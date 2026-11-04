@@ -58,19 +58,20 @@ Windows：
 
 **升级用 `--upgrade`，不要用 `--force`**：安装器在 `.agents/.standards-version` 里记了每个文件的 sha256，hash 对得上才覆盖，对不上就写成 `<文件>.new`，你的改动不会丢。
 
-## 安装后必做：生成 profile
+## 安装后必做：补齐 profile
 
-`.agents/project-profile.md` 是整套体系唯一需要按项目改的文件。**不要让人对着 28 个「未定」逐项查**，让 AI 跑一遍：
+`.agents/project-profile.md` 是整套体系唯一需要按项目改的文件。**首次安装时已经按探测结果填好初稿**（project、语言、构建命令、提交风格等），只剩 `type` / `visibility` / `verify_*` 需要人确认。
 
 ```
 /ai-dev-standards:profile
 ```
 
-`scripts/detect-profile.sh` 探测构建命令、语言版本、部署目标、提交风格、目录结构，然后只问四个必须由人决定的选择（仓库性质、提交风格、推送策略、是否现在验证），其余自动写入。
+它只问四个必须由人决定的选择（仓库性质、提交风格、推送策略、是否现在验证），其余自动写入。
 
 **这是整套体系能否生效的关键。** 一份没填完的 profile 比没有 profile 更危险：AI 会拿示例值当事实，用"看起来合理"的默认值代替项目实际情况，然后一路错下去。探测不到的字段留「未定」并列清单，不许猜。
 
-手填或从 `/init` 产物出初稿也可以，映射表见 [`references/profile-guide.md`](references/profile-guide.md)。
+**升级不改这个文件**——项目事实和手写结论不该被模板更新覆盖；要按新模板重整就手动跑上面那条命令。映射表见 [`references/profile-guide.md`](references/profile-guide.md)。
+
 
 ## 验证
 

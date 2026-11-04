@@ -146,6 +146,125 @@ if [ -f "$REPO_ROOT/scripts/detect-profile.sh" ]; then
     facts=$(bash "$REPO_ROOT/scripts/detect-profile.sh" "$target" 2>/dev/null)
 fi
 has_fact() { printf '%s\n' "$facts" | grep -q "^$1="; }
+fact() { printf '%s\n' "$facts" | sed -n "s/^$1=//p" | head -1; }
+
+# 把探测到的事实写进 profile 初稿。只填「读得到」的字段；
+# type / visibility / verify_* 这类需要人确认或实跑的，留给 /ai-dev-standards:profile。
+set_field() {  # file key value
+    [ -n "${3:-}" ] || return 0
+    awk -v k="$2" -v v="$3" '
+        !done && $0 ~ ("^" k ":") { print k ": " v; done = 1; next }
+        { print }
+    ' "$1" > "$1.seed" && mv "$1.seed" "$1"
+}
+
+# 语言块里的示例行要么启用成实际值，要么注释掉——留着示例值会被当成项目事实
+set_lang() {  # file key value
+    local p="$1" k="$2" v="$3"
+    if [ -n "$v" ]; then
+        awk -v k="$k" -v v="$v" '
+            $0 ~ ("^  # " k ":") { print "  " k ": " v; next }
+            { print }
+        ' "$p" > "$p.seed" && mv "$p.seed" "$p"
+        set_field "$p" "  $k" "$v"
+    else
+        awk -v k="$k" '
+            $0 ~ ("^  " k ":") { print "  # " substr($0, 3); next }
+            { print }
+        ' "$p" > "$p.seed" && mv "$p.seed" "$p"
+    fi
+}
+
+# 只替换某个键下面的第一条 "- 未定"
+set_list_first() {  # file key value
+    [ -n "${3:-}" ] || return 0
+    awk -v k="$2" -v v="$3" '
+        $0 ~ ("^" k ":") { inlist = 1; print; next }
+        inlist && $0 ~ /^[[:space:]]+- 未定/ { sub(/未定/, v); inlist = 0; print; next }
+        inlist && $0 !~ /^[[:space:]]/ { inlist = 0 }
+        { print }
+    ' "$1" > "$1.seed" && mv "$1.seed" "$1"
+}
+
+seed_profile() {
+    local p="$target/.agents/project-profile.md" v ch cv
+    [ "$dry" -eq 0 ] && [ -f "$p" ] || return 0
+
+    v=$(fact node_name); [ -n "$v" ] || v=$(fact maven_artifact)
+    [ -n "$v" ] || v=$(fact python_name); [ -n "$v" ] || v=$(fact dir_name)
+    set_field "$p" project "$v"
+
+    v=$(fact node_description); [ -n "$v" ] || v=$(fact maven_description)
+    [ -n "$v" ] || v=$(fact python_description); [ -n "$v" ] || v=$(fact readme_first_line)
+    set_field "$p" description "$v"
+
+    set_lang "$p" java "$(fact lang_java)"
+    set_lang "$p" python "$(fact lang_python)"
+    set_lang "$p" vue "$(fact lang_vue)"
+
+    set_field "$p" framework "$(fact framework)"
+    set_field "$p" package_manager "$(printf '%s' "$(fact package_managers)" | awk '{print $1}')"
+    set_field "$p" build_command "$(fact build_command)"
+    set_field "$p" test_command "$(fact test_command)"
+    set_field "$p" dev_command "$(fact dev_command)"
+
+    # 身份只在仓库自己配过身份时才写。否则拿到的是全局配置（可能是公司身份），
+    # 写进一个开源项目就错了，留给 /ai-dev-standards:profile 按 type 决定。
+    if [ "$(fact git_email_source)" = "local" ]; then
+        set_field "$p" git_user_name "$(fact git_user_name)"
+        if [ "$(fact git_email_noreply)" = "yes" ]; then
+            set_field "$p" git_user_email "$(git -C "$target" config user.email 2>/dev/null)"
+        fi
+    fi
+
+    ch=$(fact commit_style_company_hits); cv=$(fact commit_style_conventional_hits)
+    if [ -n "$ch" ] && [ -n "$cv" ]; then
+        [ "$ch" -gt "$cv" ] 2>/dev/null && set_field "$p" commit_style company
+        [ "$cv" -gt "$ch" ] 2>/dev/null && set_field "$p" commit_style conventional
+    fi
+
+    printf '%s' "$(fact git_remote)" | grep -q github &&
+        set_field "$p" issue_tracker "GitHub Issues"
+
+    # 部署目标：只写有证据的。有 Dockerfile 就是容器，什么都没有才是 none。
+    # 有 CI 但判断不出目标时留「未定」——写个错的比空着更糟。
+    v=$(fact deploy_target)
+    [ -n "$v" ] || { [ "$(fact pages)" = "yes" ] && v="pages"; }
+    if [ -z "$v" ]; then
+        if [ "$(fact has_dockerfile)" = "yes" ]; then
+            v="docker"
+        elif [ -z "$(fact workflow)" ]; then
+            v="none"
+        fi
+    fi
+    set_field "$p" deploy_target "$v"
+
+    if [ -n "$(fact registry)" ]; then
+        set_field "$p" registry "$(fact registry)"
+    elif [ "$v" = "none" ]; then
+        set_field "$p" registry none
+    fi
+    [ "$(fact pages)" = "yes" ] && set_field "$p" pages yes
+
+    v=$(fact tags)
+    case "$v" in
+        *v1.0.*) set_field "$p" version_scheme "v1.0.<run_number>" ;;
+        *v[0-9]*.[0-9]*.[0-9]*) set_field "$p" version_scheme "语义化 semver" ;;
+    esac
+
+    if [ -n "$(fact workflow_secrets)" ]; then
+        set_field "$p" secrets_location "GitHub Repository secrets"
+    elif [ "$(fact has_env_example)" = "yes" ]; then
+        set_field "$p" secrets_location "本地 .env"
+    fi
+
+    # ai_scope：取第一个源码目录，跳过文档与测试目录
+    v=$(printf '%s\n' "$facts" | sed -n 's/^dir=//p' | grep -vE '^(docs|tests|test)$' | head -1)
+    set_list_first "$p" ai_scope "$v"
+
+    set_list_first "$p" related_docs "$(fact doc)"
+}
+
 
 if [ "$all_modules" -eq 1 ]; then
     for f in "$REPO_ROOT"/.agents/*.md; do
@@ -200,6 +319,9 @@ skip_list=""
 conflict_list=""
 managed=()
 preserved=()
+profile_kept=0
+profile_existed=0
+[ -f "$target/.agents/project-profile.md" ] && profile_existed=1
 
 log() { printf '%s\n' "$*"; }
 
@@ -227,6 +349,14 @@ write_file() {  # src dst
 put() {
     local src="$1" dst="$2" rel rec
     rel=${dst#"$target"/}
+
+    # 升级不动项目档案：里面是项目事实和你手填的结论，模板更新不该覆盖它
+    if [ "$upgrade" -eq 1 ] && [ "$rel" = ".agents/project-profile.md" ] && [ -e "$dst" ]; then
+        profile_kept=1
+        skip_count=$((skip_count + 1))
+        managed+=("$rel")
+        return 0
+    fi
 
     # ---------- 目标不存在：新增 ----------
     if [ ! -e "$dst" ]; then
@@ -307,6 +437,14 @@ for f in "$REPO_ROOT"/.agents/*.md; do
     is_wanted "$(basename "$f")" || continue
     put "$f" "$target/.agents/$(basename "$f")"
 done
+
+# 首次安装就按探测结果填好初稿，别让人对着「未定」逐项查
+if [ "$upgrade" -eq 0 ] && [ "$profile_existed" -eq 0 ]; then
+    seed_profile
+    if [ "$dry" -eq 0 ] && [ -f "$target/.agents/project-profile.md" ]; then
+        log "  已按探测结果填好 profile 初稿；type / visibility / verify_* 仍需确认"
+    fi
+fi
 
 if [ "$minimal" -eq 1 ]; then
     # ---------- minimal：到此为止 ----------
@@ -459,6 +597,7 @@ log ""
 log "────────────────────────────"
 log "写入 $new_count 个文件，更新 $upd_count 个，跳过 $skip_count 个已存在的文件"
 log "模块：$(printf '%s\n' $wanted | wc -l | tr -d ' ')/11$([ -n "$skipped_modules" ] && printf '（与项目无关，跳过%s）' "$skipped_modules")"
+[ "$profile_kept" -eq 1 ] && log "项目档案未改动：升级不改 .agents/project-profile.md（要重整跑 /ai-dev-standards:profile）"
 [ "$dry" -eq 0 ] && [ -f "$manifest" ] && log "安装清单: .agents/.standards-version（version=$VERSION）"
 
 if [ "$conflict_count" -gt 0 ]; then
@@ -476,7 +615,7 @@ if [ -n "$skip_list" ]; then
     log "只是版本旧了用 --upgrade；确认要以模板为准请加 --force 重跑。"
 fi
 
-if [ "$dry" -eq 0 ]; then
+if [ "$dry" -eq 0 ] && [ "$profile_kept" -eq 0 ]; then
     log ""
     log "下一步（必须）：生成 .agents/project-profile.md"
     log "  文件里全是「未定」。别手填——装过插件的话跑：/ai-dev-standards:profile"

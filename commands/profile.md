@@ -13,6 +13,10 @@ argument-hint: "[目标项目目录，默认当前目录]"
 
 这份文件是整套规范唯一需要按项目改的东西。原则：**能读到的绝不问人，只有「人才能决定的事」才弹框**。
 
+> 首次安装时，安装器已经用同一个探测脚本填过一轮初稿（project、语言、构建命令、提交风格等）。
+> 这个命令负责补剩下的：`type` / `visibility` / `verify_*`，以及探测不到的项目特有信息。
+> **不要把已填的值重算一遍**，只处理还是「未定」的字段。
+
 ## 0. 先判断要不要写
 
 ```bash
@@ -22,7 +26,7 @@ ls "<目标>/.agents/project-profile.md" 2>/dev/null
 | 情况 | 动作 |
 | --- | --- |
 | 文件不存在 | 从插件的 `.agents/project-profile.md` 复制模板，然后走下面的流程 |
-| 存在，且还能 grep 到 `: 未定` | **保留已确认的值**，只填剩下的，不要整份重写 |
+| 存在，且还能 grep 到 `: 未定` | **保留已确认的值**（安装器已按探测填过一轮），只补剩下的 |
 | 存在，且没有 `未定` | **停下**，告诉用户「profile 已填好，重跑会覆盖」。除非他明确说要重新生成 |
 
 ## 1. 探测事实（不要猜）
@@ -97,17 +101,13 @@ Windows 没有 `bash` 时，按同一份清单自己读（读到就记，读不�
 | `release_trigger` | 读 workflow 的 `on:`；没有 CI 写 `manual` |
 | `version_scheme` | 看 `tags` 形态：`v1.2.3` → 语义化；`v1.0.<数字>` → run_number；纯日期 → `yyyy.mm.dd`；没有 tag 写 `语义化 semver` |
 | `registry` | 探测值；没有写 `none` |
-| `domestic_mirror` | `oss` 且 registry 是 `ghcr.io` → 阿里云 ACR；`internal` → `None` |
 | `pages` | 探测到 `pages=yes` 才写 yes |
-| `release_assets` | 有 Dockerfile → `镜像 tar.gz`；Maven 无 Docker → `jar`；纯静态 → `静态包` |
-| `retention` | `20`（除非仓库已有约定） |
 | `secrets_location` | `workflow_secrets` 非空 → `GitHub Repository secrets`；有 `.env.example` → 补 `本地 .env`；公司项目读不到 → 「未定」 |
 | `never_commit` | 从 `.gitignore` 挑 1–3 条项目特有的，通用项不要抄 |
 | `internal_endpoints.allowed_in_docs` | `internal` → `false`；`oss` → `false` |
 | `ai_scope` | 主源码目录列表 |
 | `log_language` | 默认 `en`；只有仓库历史日志全中文才写 `zh`，并说明原因 |
-| `verify_build` / `verify_test` | 与 `build_command` / `test_command` 一致 |
-| `verify_smoke` / `verify_version` / `verify_ui` | 探测不到就删掉这一行（不要留「未定」占位） |
+| `verify_build` / `verify_test` | 与 `build_command` / `test_command` 一致，**实跑通过才写** |
 | `test_port` | `9099` |
 | `related_docs` | 探测到的 `doc` 列表；没有就写 `无` |
 | `overrides` | 没有就写 `无` |

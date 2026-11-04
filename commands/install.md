@@ -53,8 +53,9 @@ Windows 等价写法是 `-WithCi` / `-WithCheck` / `-NoHooks` / `-AllModules` / 
 1. 贴出安装器最后几行汇总（写入 / 更新 / 跳过）。
 2. 提醒一件事：钩子装在 `.git/hooks/`，不进版本控制，团队其他人 clone 后要各自装；
    想让门禁跟着仓库走，用 `--shared-hooks`（写 `.githooks/` + `core.hooksPath`）。
-3. **不要问「要不要帮你填 profile」，直接读 `commands/profile.md` 并按它的流程执行**：
-   探测项目事实 → 只问四个必须由人决定的问题 → 写出完整的 `.agents/project-profile.md`。
+3. **不要问「要不要帮你填 profile」**：安装器已经按探测结果写了初稿（项目名、语言、构建命令、
+   提交风格等）。接下来读 `commands/profile.md`，只补还没填的：
+   `type` / `visibility` / `verify_*`（其余「未定」顺手问清）。
 
-别把「填 profile」当成可选项留给用户手填——28 个「未定」没人愿意逐条查。只有一种情况可以跳过：
-用户明确说了"先别填"。跳过时告诉他随时可以跑 `/ai-dev-standards:profile`。
+别把「补 profile」当成可选项留给用户手填——初稿已经在了，你只差几个只有人能答的选择。
+唯一例外：用户明确说"先别填"，那就告诉他随时可以跑 `/ai-dev-standards:profile`。

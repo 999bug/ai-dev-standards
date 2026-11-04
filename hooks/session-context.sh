@@ -25,7 +25,8 @@ cd "$project" 2>/dev/null || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 if [ -f .agents/project-profile.md ]; then
-    undecided=$(grep -cE ':[[:space:]]*未定' .agents/project-profile.md 2>/dev/null)
+    # 只数没被注释掉的键，注释里的示例值（# java: 未定）不算待确认
+    undecided=$(grep -cE '^[[:space:]]*[a-z_]+:[[:space:]]*未定' .agents/project-profile.md 2>/dev/null)
     undecided=${undecided:-0}
 
     if [ "${AI_DEV_STANDARDS_QUIET:-0}" = "1" ] && [ "$undecided" -eq 0 ]; then
