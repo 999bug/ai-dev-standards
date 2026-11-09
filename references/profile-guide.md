@@ -26,6 +26,7 @@ profile 是整套体系里唯一需要按项目改的文件。它不描述"规�
 | 字段 | 去哪读 |
 | --- | --- |
 | `languages.java` | `pom.xml` 的 `java.version` / `maven.compiler.release`，或 `build.gradle` 的 toolchain |
+| `languages.kotlin` | `gradle/libs.versions.toml` 的 `kotlin`，或 plugins 块里内联的版本 |
 | `languages.python` | `pyproject.toml` 的 `requires-python`、`.python-version` |
 | `languages.vue` | `package.json` 的 `vue` 版本 |
 | `framework` | `pom.xml` / `package.json` 的依赖 |

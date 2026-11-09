@@ -36,6 +36,7 @@
 
 | 看到什么                                               | 结论                                              | 加载                  |
 | -------------------------------------------------- | ----------------------------------------------- | ------------------- |
+| `app/build.gradle.kts` + `AndroidManifest.xml`      | Android 应用；AGP 与 SDK 版本看 `gradle/libs.versions.toml` | `lang-android.md`   |
 | `pom.xml` / `build.gradle`                         | Java 项目；JDK 版本看 `java.version` / toolchain，不看习惯 | `lang-java.md`      |
 | `pyproject.toml` / `requirements.txt` / `setup.py` | Python；解释器与依赖管理看文件本身                            | `lang-python.md`    |
 | `package.json` + `vue` 依赖 / `vite.config.*`        | Vue 前端                                          | `lang-vue.md`       |
@@ -52,6 +53,8 @@
 | 首次进入项目、准备改代码                      | `project-profile.md` + 第 2 节探测出的模块 |
 | **跨多次会话、要拆子任务、接手半成品**            | `task-workflow.md`                 |
 | 新增/修改 Java、Python、Vue 代码          | 对应 `lang-*.md`                     |
+| 新增/修改 Kotlin、Compose、Room、Gradle 脚本 | `lang-android.md`                  |
+| 打 APK、配签名、发版到 Releases / 应用商店 | `release-android.md`               |
 | **在老项目里加功能、重构巨型类、迁移分支逻辑** | `legacy.md` |
 | **对接外部系统、调第三方 SDK、处理 HTTP 响应**   | `integration.md`                   |
 | **写 commit message、定分支、合并 MR**    | `commit.md`                        |

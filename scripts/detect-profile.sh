@@ -93,7 +93,35 @@ if have pom.xml; then
     emit lang_java "$java_v"
     grep -q 'spring-boot' pom.xml 2>/dev/null && emit framework spring-boot
 fi
-if have build.gradle || have build.gradle.kts; then
+# Android 必须先判：Android 工程根目录也有 build.gradle(.kts)，只按「有 gradle 就是
+# Java 项目」会把它装成 lang-java.md，而 Android 真正的坑（Gradle JDK、Room 迁移、
+# 模拟器、签名发版）都不在那份里。判据是 AndroidManifest.xml，不是目录名。
+is_android=0
+if [ -f app/src/main/AndroidManifest.xml ]; then
+    is_android=1
+elif [ -f app/build.gradle.kts ] || [ -f app/build.gradle ]; then
+    # 模块化的老工程 Manifest 不一定在标准位置：扫到 4 层，跳过构建产物
+    manifest=$(find . -maxdepth 4 -name AndroidManifest.xml -not -path '*/build/*' 2>/dev/null | head -1)
+    [ -n "$manifest" ] && is_android=1
+fi
+if [ "$is_android" = "1" ]; then
+    emit has_android_app yes
+    # compileSdk 有三种写法：`compileSdk = 34`、`compileSdkVersion 33`、
+    # AGP 8.6+ 的 `compileSdk { version = release(36) }`（跨行）。压平再抓，
+    # 否则跨行那种一个都匹配不上。
+    emit android_compile_sdk "$(tr '\n' ' ' < app/build.gradle.kts 2>/dev/null |
+        grep -oE 'compileSdk[A-Za-z]*[^0-9]{0,40}[0-9]{2}' | grep -oE '[0-9]{2}$' | head -1)"
+    # Kotlin 版本可能在版本目录、可能在 classpath、也可能内联在 plugins 块，三种都试
+    kotlin_v=$(tr '\n' ' ' < gradle/libs.versions.toml 2>/dev/null |
+        grep -oE 'kotlin[[:space:]]*=[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"' |
+        grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    [ -n "$kotlin_v" ] || kotlin_v=$(cat build.gradle.kts app/build.gradle.kts build.gradle app/build.gradle 2>/dev/null |
+        grep -oE 'kotlin-gradle-plugin:[0-9]+\.[0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    [ -n "$kotlin_v" ] || kotlin_v=$(cat build.gradle.kts app/build.gradle.kts 2>/dev/null |
+        grep -oE '[Kk]otlin[^"]{0,60}version[[:space:]]+"[0-9]+\.[0-9]+\.[0-9]+"' |
+        grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    emit lang_kotlin "$kotlin_v"
+elif have build.gradle || have build.gradle.kts; then
     gradle_file=build.gradle
     have "$gradle_file" || gradle_file=build.gradle.kts
     emit lang_java "$(grep -oE 'languageVersion[^0-9]*[0-9]+' "$gradle_file" | head -1 | grep -oE '[0-9]+')"

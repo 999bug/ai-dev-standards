@@ -30,6 +30,7 @@ description: 未定                 # 一句话：给谁解决什么问题
 ```yaml
 languages:                        # 只填实际用到的，版本写实际值，不写 "8+"
   java: 未定                      # 取 pom.xml 的 java.version / maven.compiler.release
+  # kotlin: 1.9.24                # Android 项目看 gradle/libs.versions.toml
   # python: 3.11
   # vue: 3
 framework: 未定                   # spring-boot 3.3 / fastapi / vue / 无

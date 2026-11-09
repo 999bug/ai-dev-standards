@@ -325,7 +325,21 @@ else {
         (Test-Path (Join-Path $target 'docker-compose.yml')) -or
         (Test-Path (Join-Path $target 'compose.yaml'))
 
-    if ($hasJava) { $wanted += 'lang-java.md' }
+    # Android 必须先判：Android 工程也有 build.gradle，按「有 gradle 就是 Java」
+    # 会被装成 lang-java.md，而 Android 的坑（Gradle JDK、Room 迁移、签名发版）不在那份里
+    $hasAndroid = Test-Path (Join-Path $target 'app/src/main/AndroidManifest.xml')
+    if (-not $hasAndroid) {
+        $manifestHit = Get-ChildItem -Path $target -Recurse -Depth 4 -Filter 'AndroidManifest.xml' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\build\\' } |
+            Select-Object -First 1
+        $hasAndroid = [bool]$manifestHit
+    }
+
+    if ($hasAndroid) {
+        $wanted += 'lang-android.md'
+        $wanted += 'release-android.md'
+    }
+    elseif ($hasJava) { $wanted += 'lang-java.md' }
     if ($hasPython) { $wanted += 'lang-python.md' }
     if ($hasVue) { $wanted += 'lang-vue.md' }
     if ($hasGithub) { $wanted += 'release-github.md' }

@@ -25,6 +25,8 @@
 #   --dry-run       只打印将要做什么，不落盘
 #
 # 默认按项目裁剪模块（不用 --all-modules 时）：
+#   - lang-android 只在探测到 AndroidManifest.xml 时装（它同时带 release-android，
+#     因为出签名 APK 是必经步骤），此时不再装 lang-java
 #   - lang-java / lang-python / lang-vue 只在探测到对应语言时装
 #   - release-github 只在用了 GitHub（workflows 或 github remote）时装
 #   - release-docker 只在有 Dockerfile / compose 时装
@@ -202,6 +204,7 @@ seed_profile() {
     set_field "$p" description "$v"
 
     set_lang "$p" java "$(fact lang_java)" "$(has_fact source_java_files && echo 1 || echo 0)"
+    set_lang "$p" kotlin "$(fact lang_kotlin)" "$(has_fact has_android_app && echo 1 || echo 0)"
     set_lang "$p" python "$(fact lang_python)" "$(has_fact source_python_files && echo 1 || echo 0)"
     set_lang "$p" vue "$(fact lang_vue)" "$(has_fact source_vue_files && echo 1 || echo 0)"
 
@@ -283,7 +286,12 @@ elif [ -n "$only_modules" ]; then
     done
 else
     for m in $ALWAYS_MODULES; do add_wanted "$m"; done
-    if has_fact lang_java || has_fact source_java_files; then
+    # Android 优先：它天然是 Gradle 工程，不能被下面那条 Java 判断抢走。
+    # 探到 Android 就同时给发布模块——签名和 versionCode 是出 APK 的必经步骤。
+    if has_fact has_android_app; then
+        add_wanted lang-android.md
+        add_wanted release-android.md
+    elif has_fact lang_java || has_fact source_java_files; then
         add_wanted lang-java.md
     fi
     if has_fact lang_python || has_fact source_python_files; then
@@ -605,7 +613,8 @@ write_manifest
 log ""
 log "────────────────────────────"
 log "写入 $new_count 个文件，更新 $upd_count 个，跳过 $skip_count 个已存在的文件"
-log "模块：$(printf '%s\n' $wanted | wc -l | tr -d ' ')/11$([ -n "$skipped_modules" ] && printf '（与项目无关，跳过%s）' "$skipped_modules")"
+total_modules=$(ls -1 "$REPO_ROOT"/.agents/*.md 2>/dev/null | wc -l | tr -d ' ')
+log "模块：$(printf '%s\n' $wanted | wc -l | tr -d ' ')/${total_modules}$([ -n "$skipped_modules" ] && printf '（与项目无关，跳过%s）' "$skipped_modules")"
 [ "$profile_kept" -eq 1 ] && log "项目档案未改动：升级不改 .agents/project-profile.md（要重整跑 /ai-dev-standards:profile）"
 [ "$dry" -eq 0 ] && [ -f "$manifest" ] && log "安装清单: .agents/.standards-version（version=$VERSION）"
 

@@ -1,6 +1,6 @@
 # AI 开发规范
 
-装进项目就能生效的一套分层开发规范：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 有 11 个模块（安装时按项目裁剪），可选提交门禁与 CI 自检。目标是让 AI 按你的意图改代码，而不是按它的默认习惯。
+装进项目就能生效的一套分层开发规范：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 有 13 个模块（安装时按项目裁剪），可选提交门禁与 CI 自检。目标是让 AI 按你的意图改代码，而不是按它的默认习惯。
 
 装完一个项目只多 3 个条目：`AGENTS.md`、`.agents/`、`CLAUDE.md`。钩子进 `.git/hooks/`，不占根目录。
 
@@ -32,9 +32,10 @@ claude plugin install ai-dev-standards@ai-dev-standards --scope local
 | 纯 Java、没用 GitHub、没有 Docker | 模块 7 个 · 文件 11 个 |
 | Java + GitHub Actions + Dockerfile | 模块 9 个 · 文件 13 个 |
 | 前端 Vue + GitHub + Docker | 模块 9 个 · 文件 13 个 |
-| 要全量（旧行为） | `--all-modules`，写入 15 个文件 |
+| Android 应用 + GitHub Releases | 模块 9 个 · 文件 13 个 |
+| 要全量（旧行为） | `--all-modules`，写入 17 个文件 |
 
-判断依据直接复用 profile 的探测脚本：`pom.xml`/`build.gradle` → 只装 Java 规范，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范。**`AGENTS.md` 的分流表会同步删掉未装模块的行**，不会留悬空引用。
+判断依据直接复用 profile 的探测脚本：`app/build.gradle.kts` + `AndroidManifest.xml` → 只装 Android 规范（同时带上签名发版那份，不再装 Java），`pom.xml`/`build.gradle` → Java，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范。**`AGENTS.md` 的分流表会同步删掉未装模块的行**，不会留悬空引用。
 
 要 CI 或自检脚本，跟它说一声加上 `--with-ci` / `--with-check`；想手工指定模块用 `--modules=commit.md,lang-java.md`。
 
@@ -42,7 +43,7 @@ Windows 上没有 `bash` 也不要紧：命令会自动改用 `install.ps1`，�
 
 ### 为什么不再自动安装
 
-1.4.0 及更早的版本把安装挂在 SessionStart 上：装完插件，在任意 git 仓库开一次会话就会写入 15 个文件，其中两个是会改变提交行为的 git 钩子。这有两个问题——它和这套规范自己的第一条红线（先诊断、后动手）冲突；插件装成 `user` scope 时，clone 下来只想看一眼的仓库也会被写。
+1.4.0 及更早的版本把安装挂在 SessionStart 上：装完插件，在任意 git 仓库开一次会话就会写入整套文件（15 个，其中两个是会改变提交行为的 git 钩子）。这有两个问题——它和这套规范自己的第一条红线（先诊断、后动手）冲突；插件装成 `user` scope 时，clone 下来只想看一眼的仓库也会被写。
 
 现在 SessionStart 只做一件事：输出两三行上下文，告诉你这个仓库装没装、profile 还剩几处「未定」、改代码前该按分流表加载模块。不写文件、不执行命令。
 
@@ -176,8 +177,8 @@ bash scripts/check.sh
 | `.agents/integration.md` | 对接外部系统、调 SDK | HTTP 200 陷阱、签名与编码、时间戳单位、断线缓冲 |
 | `.agents/legacy.md` | 接手老项目、重构巨型类 | 体检 grep、找接缝、迁移只搬不改、验收清单 |
 | `.agents/task-workflow.md` | 跨多次会话、要拆子任务、接手半成品 | 何时写 spec/plan、模板、台账与交接、子代理任务书与报告 |
-| `.agents/lang-*.md` | 改对应语言时 | Java（版本特性、导入与命名、并发、超时、缓存）/ Python / Vue 的坑，通用纪律不重复 |
-| `.agents/release-*.md` | 发版、改镜像 | GitHub Actions 与 Docker 的发布、回滚 |
+| `.agents/lang-*.md` | 改对应语言时 | Java（版本特性、导入与命名、并发、超时、缓存）/ Kotlin-Android（版本基线、四层验证、Room 迁移、设备观察）/ Python / Vue 的坑，通用纪律不重复 |
+| `.agents/release-*.md` | 发版、改镜像、打 APK | GitHub Actions 与 Docker 的发布、回滚；Android 的签名、版本号、APK 校验与升级策略 |
 | `CLAUDE.md` | Claude Code 会话 | 一行 `@AGENTS.md`，让只认 CLAUDE.md 的工具读到同一份规范 |
 | `.agents/.standards-version` | 升级时 | 版本与每个文件的 sha256，`--upgrade` 据此保留你的改动 |
 | `scripts/check.sh` | 按需（`--with-check`） | 七项自检；CI 也调用它 |

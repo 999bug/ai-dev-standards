@@ -26,9 +26,11 @@ AGENTS.md（≤150 行，每次会话都读）
 ├── integration.md        对接外部系统时读
 ├── legacy.md             改老项目时读
 ├── lang-java.md          改 Java 时读
+├── lang-android.md       改 Kotlin / Compose / Room 时读
 ├── lang-python.md        改 Python 时读
 ├── lang-vue.md           改前端时读
 ├── release-github.md     发版时读
+├── release-android.md    打 APK、配签名时读
 └── release-docker.md     改镜像时读
 ```
 
