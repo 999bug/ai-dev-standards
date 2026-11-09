@@ -3,6 +3,31 @@
 版本号是插件的更新依据：`plugin.json` 里的 `version` 不变，装了插件的用户就收不到新版。
 发版流程见 `scripts/release.sh`。
 
+## [1.10.0] - 2026-11-09
+
+### 新增
+
+- **Android 开发规范 `lang-android.md`**：把「改完怎么证明没改坏」写成可执行的四层——
+  编译、单测、装机走主路径、设备端集成，并说明每层抓什么、哪一层不能省。补上版本基线的
+  三种报错（Gradle JDK 过低 / AAR 元数据 / SDK location）、`exec-out` 截图的 MSYS 路径坑、
+  模拟器卡死先杀进程而不是反复 `adb reboot`、Room 改表三件套（升版本 + Migration + 测试，
+  禁止 `fallbackToDestructiveMigration`），以及 Compose 窄屏与深色、`aapt2 dump badging`
+  核对合并后的权限。
+- **Android 发布规范 `release-android.md`**：keystore 与两个口令从第一个 Release 起离机备份
+  （换密钥 = 只能卸载重装 = `allowBackup=false` 时数据全丢）、条件式签名配置（缺变量时本地
+  仍可出包）、CI 四个 secret、`versionCode` 单调递增、先验签再上传、`.sha256` 只证明字节完整
+  不证明来源。升级策略按「产品承诺」分成三档，明确加 `INTERNET` / `REQUEST_INSTALL_PACKAGES`
+  必须同一次改动里改隐私说明；要做自更新给到清单字段与 `PackageInstaller` 最小骨架。
+- **探测与裁剪接上 Android**：按 `AndroidManifest.xml` 判定，Android 工程不再被
+  `build.gradle` 误判成普通 Java 项目；`compileSdk` 兼容三种写法（含 AGP 8.6+ 跨行的
+  `release(37)`），Kotlin 版本依次查版本目录、classpath、plugins 块。装 Android 时连带
+  `release-android.md`，因为出签名包是必经步骤。profile 模板补 `languages.kotlin`。
+
+### 修复
+
+- `install.sh` 汇总里的模块总数写死成 `/11`，加模块后必然过期；改为按 `.agents/*.md`
+  实际数量统计。`install.ps1` 原本就是动态的，两边行为现在一致。
+
 ## [1.9.1] - 2026-11-04
 
 ### 新增
