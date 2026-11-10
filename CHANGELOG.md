@@ -3,6 +3,31 @@
 版本号是插件的更新依据：`plugin.json` 里的 `version` 不变，装了插件的用户就收不到新版。
 发版流程见 `scripts/release.sh`。
 
+## [1.11.1] - 2026-11-10
+
+### 新增
+
+- **双推国内 registry 的兼容与门禁**：`release-docker.md` 第 6 节补上 buildx 默认附加 OCI
+  attestation 的问题——阿里云 ACR 个人版以 `unknown manifest class`（或清单里出现
+  `platform: unknown/unknown`）拒绝，表现为推 ghcr 成功、推 ACR 失败，构建步骤需显式
+  `provenance: false`；要保留证明链路就换支持 OCI 1.1 的企业版仓库，不要同一个版本号两边硬推。
+  同节记下浮动工具链漂移：`setup-buildx` 默认装最新 buildx，同一份 workflow 隔几个月会产出
+  另一种 manifest，「以前能推、现在不能推」多半是这条而不是配置写错。第 10 节高频坑补三行
+  （绿勾但镜像缺失 / `unknown manifest class` / 浮动工具链漂移）。
+
+### 修复
+
+- `release-docker.md` 第 6 节原写「国内同步放独立步骤并 `continue-on-error`：失败只标红，
+  不阻塞发版」，既与 1.11.0 已修的分发支路条款相反，也与实测结果不符：`continue-on-error`
+  下 job 结论仍是成功、整条 run 是绿的，ACR 缺镜像没人发现。改为国内同步前置于 tag / Release、
+  **失败即中止本次发布**——宁可不发版，也不发一个国内仓库拉不到的版本；前置时两者都还没生成，
+  重跑不会撞版本号。同时把「未配 secrets 跳过」与「配了但失败」分开：前者 `exit 0`，后者
+  `::error::` + `exit 1`，不再用 `::warning::` + `exit 0` 把失败吞掉。
+- `release-github.md` 第 6 节按是否依赖 Release 产物拆成两种落法：不依赖的（镜像双推）前置
+  门禁、失败中止发布；必须依赖的（附件镜像）只能后置、失败标红 + 人工补传。第 9 节回滚条款
+  限定为「已发布之后」，消掉与容器侧的互相矛盾。README 模块表补「双推国内 registry 的门禁与
+  兼容」。
+
 ## [1.11.0] - 2026-11-10
 
 ### 新增
