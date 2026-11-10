@@ -49,7 +49,10 @@
 ## 6. 国内镜像（registry 拉不动时）
 
 - **【默认】主仓 + 国内镜像双推**：国际 registry 为主，国内 registry（阿里云 ACR / 腾讯云 TCR / 华为云 SWR）为备。
-- **【默认】国内同步放独立步骤并 `continue-on-error`**：同步失败只标红，不阻塞发版；日志给出具体原因。
+- **【红线】国内同步失败就不发版本**：同步步骤排在 tag / Release **之前**，不设 `continue-on-error`。宁可这次没有版本，也不要发一个国内仓库拉不到的版本——「发布成功但镜像缺失」是把问题留给用户。前置于发布也不会撞 tag / Release（两者都还没生成），重跑安全；代价只是主仓多推了一个没发布出去的镜像。
+- **【默认】「没配 secrets」不算失败，「配了但失败」必须失败**：secrets 为空时打日志后 `exit 0`（可选分发未启用不算失败）；登录 / 推送失败用 `::error::` + `exit 1`，不要 `::warning::` + `exit 0` 把失败吞成绿勾——`continue-on-error` 或 `exit 0` 下整条 run 仍是成功状态，缺口没人看得见。
+- **【默认】双推前显式关掉 buildx 的默认证明（`provenance: false`）**：新版 buildx 默认给镜像附加 OCI attestation，阿里云 ACR 个人版会以 `unknown manifest class`（或清单里出现 `platform: unknown/unknown`）拒绝，表现为推 ghcr 成功、推 ACR 失败。需要证明链路的换支持 OCI 1.1 的企业版仓库，不要同一个版本号两边硬推。
+- **【默认】影响产物的默认值要显式写进 workflow**：`setup-buildx` 默认装最新 buildx，同一份 workflow 隔几个月可能产出另一种 manifest——「以前能推、现在不能推」多半是这条，不是配置写错了。发版链路要能长期复现，就别依赖工具的当前默认值。
 - **【默认】同步前对凭据做去空白处理**，并给出常见错误对照（403 = 密码/用户名/域名不对；`no such host` = 地址带了 `https://`；`invalid control character` = 值里有换行）。
 - **【默认】服务器 `.env` 的 `IMAGE` 指向国内 registry**，否则"配了镜像源但依然很慢"。
 - **【默认】cron 自动更新只能用 `latest`，且 cron 用户必须与 `docker login` 用户一致**，否则静默 401。
@@ -87,3 +90,6 @@ docker inspect <container> --format '{{.State.Health.Status}}'
 | 健康检查一直 unhealthy | 打的是依赖外部系统的接口，或 `start-period` 太短 |
 | `up -d` 后版本没变 | 镜像没拉成功 / tag 没改 / compose 缓存了旧镜像 |
 | 本地没装 Docker 却说"镜像验证过" | 不能验证就明确说"未验证，需 CI 或目标机确认" |
+| 发布标绿但国内 registry 没有镜像 | 同步步骤设了 `continue-on-error` 或失败后 `exit 0`，整条 run 仍是成功；同步应前置于 tag / Release 并让失败中止发布 |
+| 推 ACR 报 `unknown manifest class` / `platform unknown/unknown` | buildx 默认附加 OCI attestation（provenance），构建步骤加 `provenance: false` |
+| 同一份 workflow 以前能推、现在不能推 | 浮动工具链（`setup-buildx` 默认装最新 buildx）改了产物默认值，不是这次配置改错了 |
