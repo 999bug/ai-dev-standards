@@ -3,6 +3,33 @@
 版本号是插件的更新依据：`plugin.json` 里的 `version` 不变，装了插件的用户就收不到新版。
 发版流程见 `scripts/release.sh`。
 
+## [1.11.0] - 2026-11-10
+
+### 新增
+
+- **Gitee Release 镜像规范 `.agents/release-gitee.md`**：把「GitHub 权威发布 + Gitee 国内分发」
+  写成可执行规则。先分清 L1 代码 / L2 Release 元数据 / L3 Release 附件三层，明确平台仓库镜像
+  只覆盖 L1、附件必须由 CI 调 OpenAPI 单独上传；方案选型收敛到「复用同一份 artifact + 镜像 job
+  挂在唯一发布 workflow 后面」。三条硬原则：产物只构建一次、先自检再写入并验返回体、不复用
+  tag / 不覆盖同名 Release。补齐一次性准备、每次发版 SOP、API 速查、失败只补镜像、两端验证、
+  回滚约束、高频坑与迁移 Checklist。
+- **完整操作手册 `references/gitee-release-sync.md`**：留在规范仓库、不装进目标项目。含可直接
+  搬走的 `mirror-gitee` job 模板与参数替换表、Gitee OpenAPI 速查、Git Bash 与 Windows 两套人工
+  补传脚本、验证清单、限制与回滚。原文档里的实例仓库、账号与项目私有文档引用已全部抽象掉。
+- **探测与裁剪接上 Gitee 场景**：`detect-profile.sh` 增 `gitee_mirror` 事实，只认 workflow 里
+  调了 Gitee API / 用了 `GITEE_TOKEN` 或存在 gitee 远端，不打印远端 URL；两个安装器据此装
+  `release-gitee.md` 并连带 `release-github.md`（镜像 job 必须挂在现有发布 workflow 后面）。
+  `AGENTS.md` 第 2、3 节登记新模块，未装时分流表对应行照样会被删掉。
+- **README 增加手册索引与场景说明**，模块数 13 → 14、默认全量 17 → 18；SKILL、
+  commands/install、docs/manual-install、references 里的计数同步对账。
+
+### 修复
+
+- `release-github.md` 第 6 节原写「可选步骤用 `continue-on-error: true`（例如同步国内镜像）」，
+  与实测结论相反：分发支路失败应标红让缺口可见，但不回滚、不重跑主链路，按规范人工补传。
+  同时去掉边界行对未安装模块的悬空引用，裁剪后目标项目的 `check.sh` 第 4 项不再有断链风险。
+- `docs/manual-install.md` 的全量模块数停在 11（1.10.0 后就不对），改为 14。
+
 ## [1.10.0] - 2026-11-09
 
 ### 新增
