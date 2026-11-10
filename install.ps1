@@ -255,6 +255,7 @@ function Write-Manifest {
 
 # ---------- 模块裁剪：只装和这个项目有关的规范 ----------
 # 跨语言、任何项目都用得上：项目档案、提交规范、纪律、任务工作流、外部对接、老系统方法论
+# Gitee 分发镜像只在 workflow 真的调了 Gitee API / 用了 GITEE_TOKEN，或存在 gitee 远端时装
 $alwaysModules = @('project-profile.md', 'commit.md', 'discipline.md', 'task-workflow.md', 'integration.md', 'legacy.md')
 $allModuleFiles = @(Get-ChildItem -Path (Join-Path $repoRoot '.agents') -Filter '*.md' -File | ForEach-Object { $_.Name })
 
@@ -344,6 +345,30 @@ else {
     if ($hasVue) { $wanted += 'lang-vue.md' }
     if ($hasGithub) { $wanted += 'release-github.md' }
     if ($hasDocker) { $wanted += 'release-docker.md' }
+
+    # Gitee 分发镜像：只认 workflow 里真的调了 Gitee API / 用了 GITEE_TOKEN，
+    # 或远端本来就在 Gitee；只凭「有 .github/workflows」不算。
+    $hasGitee = $false
+    $giteeWorkflowDir = Join-Path $target '.github/workflows'
+    if (Test-Path $giteeWorkflowDir) {
+        $giteeHit = @(Get-ChildItem -Path $giteeWorkflowDir -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '\.ya?ml$' } |
+            Select-String -Pattern 'gitee\.com|GITEE_TOKEN|attach_files' -List |
+            Select-Object -First 1)
+        $hasGitee = ($giteeHit.Count -gt 0)
+    }
+    if (-not $hasGitee) {
+        try {
+            $giteeRemotes = & git -C $target remote -v 2>$null
+            if ($giteeRemotes -match 'gitee') { $hasGitee = $true }
+        }
+        catch { }
+    }
+    # 镜像 job 挂在现有发布 workflow 后，装 Gitee 规范时连带发布规范
+    if ($hasGitee) {
+        if ($wanted -notcontains 'release-github.md') { $wanted += 'release-github.md' }
+        $wanted += 'release-gitee.md'
+    }
 }
 
 $skippedModules = @($allModuleFiles | Where-Object { $wanted -notcontains $_ })

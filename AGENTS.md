@@ -42,6 +42,7 @@
 | `package.json` + `vue` 依赖 / `vite.config.*`        | Vue 前端                                          | `lang-vue.md`       |
 | `Dockerfile` / `docker-compose*.yml`               | 容器交付                                            | `release-docker.md` |
 | `.github/workflows/*.yml`                          | 已有流水线，**先读再改**，不要另起一套                           | `release-github.md` |
+| `.github/workflows/*` 出现 `gitee.com` / `GITEE_TOKEN`，或有 gitee 远端 | 发布产物要单独同步到 Gitee（仓库镜像不带附件） | `release-gitee.md` |
 | `.env.example` / `config/*.json` / `secrets`       | 有运行时配置，先确认哪些不入库                                 | `discipline.md`     |
 | 单个类 >1000 行 / 核心流程里按实现名分支（`isXxxType`） | 老系统，**不要直接加功能**，先看体检与接缝                        | `legacy.md`         |
 | `.agents/project-profile.md` 的 `related_docs`      | 项目自有文档（部署、流程、决策记录）                              | 先读，优先级高于通用建议        |
@@ -60,6 +61,7 @@
 | **写 commit message、定分支、合并 MR**    | `commit.md`                        |
 | 准备发版、改 tag/Release/Pages/workflow | `release-github.md` + `commit.md`  |
 | 改 Dockerfile、compose、镜像源、部署方式     | `release-docker.md`                |
+| **把 Release 附件同步到 Gitee、调 Gitee OpenAPI、镜像失败补传** | `release-gitee.md` |
 | 碰凭据、日志、示例数据、提交历史                  | `discipline.md`                    |
 | 收尾（提交、清理、交付说明）                    | `discipline.md` + `commit.md`      |
 
@@ -117,4 +119,4 @@
 - 新增规则先加到对应模块；只有跨语言、跨项目都成立的才提到本文件的红线区。
 - 每次调整后更新本文件末尾的 `last-verified`。
 
-last-verified: 2026-10-30
+last-verified: 2026-11-10

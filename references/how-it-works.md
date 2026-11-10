@@ -31,7 +31,8 @@ AGENTS.md（≤150 行，每次会话都读）
 ├── lang-vue.md           改前端时读
 ├── release-github.md     发版时读
 ├── release-android.md    打 APK、配签名时读
-└── release-docker.md     改镜像时读
+├── release-docker.md     改镜像时读
+└── release-gitee.md      Release 附件同步到 Gitee 时读
 ```
 
 **分流表是这套体系的开关。** 新增模块必须同时登记触发条件，否则永远加载不到——`scripts/check.sh` 的第 3 项检查就是拦这个。

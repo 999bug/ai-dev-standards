@@ -84,9 +84,9 @@ chmod +x install.sh
 | 纯 Java、无 GitHub、无 Docker | 7 |
 | Java + GitHub Actions + Dockerfile | 9 |
 | 前端 Vue + GitHub + Docker | 9 |
-| 全量（`--all-modules`） | 11 |
+| 全量（`--all-modules`） | 14 |
 
-判断依据是文件存在性：`pom.xml`/`build.gradle` → Java，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范。跨语言的项目档案、提交、纪律、任务工作流、外部对接、老系统方法论始终装。
+判断依据是文件存在性：`pom.xml`/`build.gradle` → Java，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范，workflow 里调了 Gitee API / 用了 `GITEE_TOKEN` 或存在 gitee 远端 → 再装 Gitee 镜像规范（连带发布规范）。跨语言的项目档案、提交、纪律、任务工作流、外部对接、老系统方法论始终装。
 
 `AGENTS.md` 的分流表会同步删掉未装模块的行——否则 AI 会照表去读不存在的文件。
 

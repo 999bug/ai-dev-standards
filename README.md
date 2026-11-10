@@ -1,6 +1,6 @@
 # AI 开发规范
 
-装进项目就能生效的一套分层开发规范：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 有 13 个模块（安装时按项目裁剪），可选提交门禁与 CI 自检。目标是让 AI 按你的意图改代码，而不是按它的默认习惯。
+装进项目就能生效的一套分层开发规范：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 有 14 个模块（安装时按项目裁剪），可选提交门禁与 CI 自检。目标是让 AI 按你的意图改代码，而不是按它的默认习惯。
 
 装完一个项目只多 3 个条目：`AGENTS.md`、`.agents/`、`CLAUDE.md`。钩子进 `.git/hooks/`，不占根目录。
 
@@ -33,9 +33,9 @@ claude plugin install ai-dev-standards@ai-dev-standards --scope local
 | Java + GitHub Actions + Dockerfile | 模块 9 个 · 文件 13 个 |
 | 前端 Vue + GitHub + Docker | 模块 9 个 · 文件 13 个 |
 | Android 应用 + GitHub Releases | 模块 9 个 · 文件 13 个 |
-| 要全量（旧行为） | `--all-modules`，写入 17 个文件 |
+| 要全量（旧行为） | `--all-modules`，写入 18 个文件 |
 
-判断依据直接复用 profile 的探测脚本：`app/build.gradle.kts` + `AndroidManifest.xml` → 只装 Android 规范（同时带上签名发版那份，不再装 Java），`pom.xml`/`build.gradle` → Java，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范。**`AGENTS.md` 的分流表会同步删掉未装模块的行**，不会留悬空引用。
+判断依据直接复用 profile 的探测脚本：`app/build.gradle.kts` + `AndroidManifest.xml` → 只装 Android 规范（同时带上签名发版那份，不再装 Java），`pom.xml`/`build.gradle` → Java，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范。workflow 里真的调了 Gitee API / 用了 `GITEE_TOKEN`，或存在 gitee 远端 → 再装 `release-gitee.md`（会连带发布规范），因为仓库镜像不带 Release 附件。**`AGENTS.md` 的分流表会同步删掉未装模块的行**，不会留悬空引用。
 
 要 CI 或自检脚本，跟它说一声加上 `--with-ci` / `--with-check`；想手工指定模块用 `--modules=commit.md,lang-java.md`。
 
@@ -178,7 +178,7 @@ bash scripts/check.sh
 | `.agents/legacy.md` | 接手老项目、重构巨型类 | 体检 grep、找接缝、迁移只搬不改、验收清单 |
 | `.agents/task-workflow.md` | 跨多次会话、要拆子任务、接手半成品 | 何时写 spec/plan、模板、台账与交接、子代理任务书与报告 |
 | `.agents/lang-*.md` | 改对应语言时 | Java（版本特性、导入与命名、并发、超时、缓存）/ Kotlin-Android（版本基线、四层验证、Room 迁移、设备观察）/ Python / Vue 的坑，通用纪律不重复 |
-| `.agents/release-*.md` | 发版、改镜像、打 APK | GitHub Actions 与 Docker 的发布、回滚；Android 的签名、版本号、APK 校验与升级策略 |
+| `.agents/release-*.md` | 发版、改镜像、打 APK、同步国内分发 | GitHub Actions 与 Docker 的发布、回滚；Android 的签名、版本号、APK 校验与升级策略；Gitee Release 附件的镜像、校验与失败补传 |
 | `CLAUDE.md` | Claude Code 会话 | 一行 `@AGENTS.md`，让只认 CLAUDE.md 的工具读到同一份规范 |
 | `.agents/.standards-version` | 升级时 | 版本与每个文件的 sha256，`--upgrade` 据此保留你的改动 |
 | `scripts/check.sh` | 按需（`--with-check`） | 七项自检；CI 也调用它 |
@@ -186,6 +186,14 @@ bash scripts/check.sh
 | `templates/github/check.yml` | 目标项目的 CI | 自检 + 历史邮箱扫描 |
 
 `install.sh` / `install.ps1` 负责把这些装到目标项目，默认不覆盖已有文件。运作原理见 [`references/how-it-works.md`](references/how-it-works.md)，扩展写法见 [`references/extending.md`](references/extending.md)，发版见 [`references/claude-code.md`](references/claude-code.md)。
+
+## 发版产物同步到 Gitee
+
+需要把 GitHub Release 附件镜像到 Gitee 的项目，安装器会额外带上 `.agents/release-gitee.md`，并把触发条件登记进 `AGENTS.md` 第 2、3 节。探测依据是 workflow 里真的调了 Gitee API / 用了 `GITEE_TOKEN`，或存在 gitee 远端——只凭「用了 GitHub Actions」不会多装一份用不上的规范。
+
+完整操作手册单独一份，留在规范仓库、不装进目标项目：**[references/gitee-release-sync.md](references/gitee-release-sync.md)**。里面有可直接搬走的镜像 job 模板、参数替换表、Gitee OpenAPI 速查、Git Bash 与 PowerShell 两套人工补传脚本、验证清单、高频坑与迁移 Checklist。
+
+手册解决的核心误区：平台的「仓库镜像」只同步分支、标签和提交，**不含 Release 附件**；附件必须由 CI 复用同一份 artifact、调 API 单独上传。
 
 ## 许可
 
@@ -198,4 +206,4 @@ ai-dev-standards by saul, licensed under CC BY 4.0 (docs) and MIT (scripts)
 https://github.com/999bug/ai-dev-standards
 ```
 
-last-verified: 2026-11-04
+last-verified: 2026-11-10

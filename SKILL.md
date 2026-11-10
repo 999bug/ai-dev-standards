@@ -7,7 +7,7 @@ description: Installs and maintains a layered AI development standards kit into 
 
 ## 用途
 
-把一个可复制的分层规范体系装进任意项目：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 13 个模块，配套 `commit-msg` 钩子与 CI 自检，把「规范」从文档里的红线变成会失败的提交与流水线。
+把一个可复制的分层规范体系装进任意项目：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 14 个模块，配套 `commit-msg` 钩子与 CI 自检，把「规范」从文档里的红线变成会失败的提交与流水线。
 
 规范化必须落地到项目根目录，才能被 Codex / Cursor / Claude Code 等工具读到——只在对话里讲规则是没用的。
 
@@ -42,17 +42,17 @@ Windows：
 | --- | --- |
 | （无） | `AGENTS.md` + `CLAUDE.md` + **与项目相关**的 `.agents/` 模块，并把 git 钩子装进 `.git/hooks/` |
 | `--with-check` | 加 `scripts/check.sh`（七项自检） |
-| `--with-ci` | 加 `.github/workflows/check.yml`，会自动带上 `check.sh` |
+| `--with-ci` | 加 `.github/workflows/check.yml`，会自动带上 `scripts/check.sh` |
 | `--no-hooks` | 不装 git 钩子（默认是装的） |
 | `--shared-hooks` | 钩子装进项目里的 `.githooks/` 并设 `core.hooksPath`，跟仓库一起提交 |
 | `--upgrade` | 升级已装的规范：没改过的更新，改过的另存为 `.new` |
-| `--all-modules` | 不裁剪，`.agents/` 下 13 个模块全装（旧行为） |
+| `--all-modules` | 不裁剪，`.agents/` 下 14 个模块全装（旧行为） |
 | `--modules=a,b` | 只装指定模块，例如 `--modules=commit.md,lang-java.md` |
 | `--minimal` | 只装 `AGENTS.md` + `.agents/`，项目根只多 2 个条目 |
 | `--force` | 覆盖已存在文件（默认不覆盖，只跳过并报告） |
 | `--dry-run` | 只预览，不落盘 |
 
-**模块按项目裁剪**（默认）：`app/build.gradle.kts` + `AndroidManifest.xml` → Android（同时带签名发版，不再装 Java），`pom.xml`/`build.gradle` → Java，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范。跨语言的项目档案、提交、纪律、任务工作流、外部对接、老系统方法论始终装。`AGENTS.md` 的分流表会同步删掉未装模块的行，不留悬空引用。
+**模块按项目裁剪**（默认）：`app/build.gradle.kts` + `AndroidManifest.xml` → Android（同时带签名发版，不再装 Java），`pom.xml`/`build.gradle` → Java，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范，workflow 里调了 Gitee API / 用了 `GITEE_TOKEN` 或存在 gitee 远端 → 再带 `release-gitee.md`。跨语言的项目档案、提交、纪律、任务工作流、外部对接、老系统方法论始终装。`AGENTS.md` 的分流表会同步删掉未装模块的行，不留悬空引用。
 
 **默认不覆盖已存在的文件**：目标项目可能已经改过 `AGENTS.md` 或某个模块，直接覆盖等于抹掉别人的工作。装过一次后再跑不会重写任何东西（写入 0）。
 
@@ -70,7 +70,7 @@ Windows：
 
 **这是整套体系能否生效的关键。** 一份没填完的 profile 比没有 profile 更危险：AI 会拿示例值当事实，用"看起来合理"的默认值代替项目实际情况，然后一路错下去。探测不到的字段留「未定」并列清单，不许猜。
 
-**升级不改这个文件**——项目事实和手写结论不该被模板更新覆盖；要按新模板重整就手动跑上面那条命令。映射表见 [`references/profile-guide.md`](references/profile-guide.md)。
+**升级不改这个文件**——项目事实和手写结论不该被模板更新覆盖；要按新模板重整就手动跑 `/ai-dev-standards:profile`。映射表见 [`references/profile-guide.md`](references/profile-guide.md)。
 
 
 ## 验证
@@ -114,10 +114,10 @@ bash scripts/check.sh
 ai-dev-standards/
 ├── AGENTS.md                    入口（装到项目的根目录）
 ├── CLAUDE.md                    Claude Code 的兼容入口
-├── .agents/                     13 个按任务加载的模块
+├── .agents/                     14 个按任务加载的模块
 │   ├── project-profile.md       项目事实（每个项目唯一要改的文件）
 │   ├── commit.md · discipline.md · integration.md · legacy.md · task-workflow.md
-│   └── lang-{java,android,python,vue}.md · release-{android,github,docker}.md
+│   └── lang-{java,android,python,vue}.md · release-{android,github,docker,gitee}.md
 ├── .claude-plugin/              插件与市场清单（版本号唯一来源）
 ├── commands/                    插件命令：install · upgrade
 ├── hooks/                       SessionStart 上下文提醒（只读）
@@ -126,7 +126,7 @@ ai-dev-standards/
 ├── templates/
 │   ├── githooks/                commit-msg · post-commit
 │   └── github/check.yml         CI 模板
-├── references/                  profile 填写 · 运作原理 · 扩展写法 · Claude Code 用法
+├── references/                  profile 填写 · 运作原理 · 扩展写法 · Claude Code 用法 · Gitee 发布同步手册
 ├── install.sh / install.ps1     安装器
 └── reviews/                     待审批的经验提取报告
 ```

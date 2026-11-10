@@ -43,7 +43,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/install.sh" "<目标>"
 
 默认级别＝**与项目相关**的规范模块 + `CLAUDE.md` + `.git/hooks/` 下的两个钩子，不写 CI、不写 `scripts/`。
 
-安装器会按项目裁剪模块：Android 项目装 Android 那份（含签名发版）不装 Java，Java 项目不装 Python/Vue 规范，没用 GitHub 不装发布规范，没有 Docker 不装容器规范。`AGENTS.md` 的分流表会同步删掉未装模块的行。汇总里会写「模块：7/13（与项目无关，跳过 …）」——如果它判断错了，用 `--modules=` 补装，或 `--all-modules` 全装。
+安装器会按项目裁剪模块：Android 项目装 Android 那份（含签名发版）不装 Java，Java 项目不装 Python/Vue 规范，没用 GitHub 不装发布规范，没有 Docker 不装容器规范，workflow 里没调 Gitee API / 没用 `GITEE_TOKEN` 就不装 Gitee 镜像规范。`AGENTS.md` 的分流表会同步删掉未装模块的行。汇总里会写「模块：7/14（与项目无关，跳过 …）」——如果它判断错了，用 `--modules=` 补装，或 `--all-modules` 全装。
 
 用户明确要 CI 或自检脚本时再加 `--with-ci` / `--with-check`；不想装钩子加 `--no-hooks`。
 Windows 等价写法是 `-WithCi` / `-WithCheck` / `-NoHooks` / `-AllModules` / `-Modules`。

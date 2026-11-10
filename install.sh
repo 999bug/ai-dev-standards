@@ -29,6 +29,8 @@
 #     因为出签名 APK 是必经步骤），此时不再装 lang-java
 #   - lang-java / lang-python / lang-vue 只在探测到对应语言时装
 #   - release-github 只在用了 GitHub（workflows 或 github remote）时装
+#   - release-gitee 只在探测到 Gitee 分发镜像（workflow 调 Gitee API / 用 GITEE_TOKEN，
+#     或存在 gitee 远端）时装，并连带 release-github
 #   - release-docker 只在有 Dockerfile / compose 时装
 #   跨语言的四件（project-profile、commit、discipline、task-workflow）和方法论两件
 #   （integration、legacy）始终装。AGENTS.md 的分流表会同步删掉未装模块的行，
@@ -302,6 +304,11 @@ else
     fi
     if has_fact workflow || printf '%s\n' "$facts" | grep -q '^git_remote=.*github'; then
         add_wanted release-github.md
+    fi
+    # 镜像 job 必须挂在现有发布 workflow 后面，装 Gitee 规范时连带发布规范
+    if has_fact gitee_mirror; then
+        add_wanted release-github.md
+        add_wanted release-gitee.md
     fi
     if has_fact has_dockerfile || printf '%s\n' "$facts" | grep -q '^deploy_target=docker-compose'; then
         add_wanted release-docker.md

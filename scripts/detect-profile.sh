@@ -245,6 +245,17 @@ fi
 have release-please-config.json && emit release_tool release-please
 have .releaserc && emit release_tool semantic-release
 
+# Gitee 分发镜像：仓库镜像只同步代码与 tag，Release 附件要单独传。
+# 判据是 workflow 里真的调了 Gitee API / 用了 GITEE_TOKEN，或远端本来就在 Gitee；
+# 只凭「有 .github/workflows」不算，否则每个 GitHub 项目都会多装一份用不上的规范。
+# 只输出 yes，不打印远端 URL——它可能带真实账号。
+gitee_hint=""
+if [ -d .github/workflows ]; then
+    gitee_hint=$(grep -rilE 'gitee\.com|GITEE_TOKEN|attach_files' .github/workflows 2>/dev/null | head -1)
+fi
+[ -n "$gitee_hint" ] || gitee_hint=$(git remote -v 2>/dev/null | grep -i 'gitee' | head -1)
+[ -n "$gitee_hint" ] && emit gitee_mirror yes
+
 printf '\n# 七、敏感信息\n'
 if have .env.example || have .env.sample; then emit has_env_example yes; fi
 if [ -d .github/workflows ]; then

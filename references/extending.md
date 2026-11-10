@@ -77,7 +77,7 @@ if (!res.ok()) throw new ApiException(res.reason());
 
 平台指部署环境：k8s、Serverless、移动端、嵌入式等。
 
-结构参考 `release-github.md` / `release-android.md` / `release-docker.md`：
+结构参考 `release-github.md` / `release-android.md` / `release-docker.md` / `release-gitee.md`：
 
 ```
 ## 0. 动手前          ← 先读什么、确认哪三件事
