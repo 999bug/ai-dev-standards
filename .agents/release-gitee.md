@@ -21,11 +21,12 @@
 - **【默认】分发链路真正要的是 L2 + L3**。只要求「国内能下载到包」时，L1 可以完全不做：Gitee 建一个公开空仓库、初始化默认分支即可，`target_commitish` 指向它。
 - **【默认】方案选型**：一年发一两次的试验项目可纯手工；任何需要持续国内分发的项目用 **CI 复用 artifact + 调 OpenAPI**（第 5 节）。双远端 / 仓库镜像 + 网页补附件都会漏 L3，且不能保证两端同一份字节。
 
-## 2. 三条硬原则
+## 2. 四条硬原则
 
 1. **【红线】产物只构建一次**。镜像端绝不重新构建，否则签名、时间戳、哈希都可能偏差。CI 里用 `upload-artifact` / `download-artifact` 传同一份；人工补传时从**已发布的 GitHub Release** 下载，不要本地再打一次包。
 2. **【红线】先自检再写入，写完要验返回体**。调 API 前查令牌、产物、同名 Release；每次写入后解析 `id` / `browser_download_url`，缺失就报错退出。只判断 HTTP 200 不算成功。
 3. **【红线】不复用 tag、不覆盖同名 Release**。同名一律拒绝，回退靠发更高版本号，不靠 `--clobber` 或删了重建。
+4. **【红线】「发布完成」的判据是清单，不是 Release 创建**。平台 API 强制「先建 Release 拿到 `release_id` 才能传附件」，这段窗口期里最新版已经可见、附件却没齐——客户端会推着一个点不动的下载按钮。所以：附件全部校验通过后**最后写清单**（如 `latest.json`），清单的 `version` 等于本次 tag 才算发完。有应用内更新链路的项目，客户端**只读清单，不调 `releases/latest`**（匿名调用会被限流返回 403）。
 
 - **【红线】凭据不进 workflow、README、文档、命令行历史或提交记录**。令牌只放 Secrets，文档里一律 `<your-token>`，本地自检用交互式读取。
 - **【红线】镜像失败不回滚、不重跑整个 workflow**。GitHub 侧已发布成功，重跑必然撞同名 tag；只补镜像这一步（第 7 节）。
@@ -43,15 +44,16 @@
 
 1. 版本号递增、tag 与产物版本一致、目标 tag 两端都不存在；本地构建 / 测试 / lint 通过，产物已验签并生成 `.sha256`。
 2. 触发唯一的发布 workflow：发布 job 上传 artifact + 创建 GitHub Release（权威）。
-3. 镜像 job（`needs:` 发布 job）下载**同一份** artifact：检查配置与产物 → 列出已有 Release 并拒绝同名 → 创建 Gitee Release → 逐个上传附件并校验 `browser_download_url`。
+3. 镜像 job（`needs:` 发布 job）下载**同一份** artifact：检查配置与产物 → 列出已有 Release 并拒绝同名 → 创建 Gitee Release → 逐个上传附件并校验 `browser_download_url` → 附件全齐后**最后写清单**。
 4. 按第 8 节验证。**【红线】不凭「流水线绿了」宣布发布成功**。
 
 - **【默认】镜像 job 不设 `continue-on-error`**：失败即标红，让「国内镜像缺失」看得见。只有 Gitee 确实是可有可无的备份时才允许设，且必须打明确日志。
 - **【默认】镜像失败的处置策略写进项目发布文档**，别让值班的人临场猜。
+- **【默认】清单写入可单独重跑**：主流程失败在清单这一步时，补写清单不该重跑整条流水线（会撞 tag）。单独一个 workflow，或 `workflow_dispatch` 的 `manifest_only` 输入。
 
-## 5. workflow 骨架的关键点
+## 5. workflow 骨架
 
-自己写镜像 job 时必须包含（完整可搬的模板见操作手册）：
+自己写镜像 job 时必须包含（完整模板、参数替换表与两套人工补传脚本见操作手册）：
 
 - `needs: <发布 job>` + `download-artifact`：保证两端同一份字节。
 - 配置自检：令牌为空、artifact 为空、产物 glob 不匹配（含 `.sha256`）任一命中就 `exit 1`。
@@ -59,6 +61,63 @@
 - 创建后解析 `id` 判空；上传后解析 `browser_download_url` 判空。
 - `target_commitish` 显式写配置的分支变量，不依赖默认值；tag 表达式按触发方式改（`inputs.version` 或 `github.ref_name`）。
 - 产物目录只放主产物与校验文件，别把日志、报告混进去。
+
+下面这份压缩骨架覆盖上面六条，段落顺序不要改（自检 → 幂等 → 建 → 传 → 写清单）：
+
+```yaml
+mirror-gitee:
+  needs: <release-job>                   # 挂在唯一发布 job 后面，不另起打 tag 的流水线
+  runs-on: ubuntu-latest
+  permissions:
+    contents: read
+    actions: read                        # 下载 artifact 需要
+  env:
+    TAG: ${{ needs.<release-job>.outputs.tag }}   # 手填触发则改 inputs.version
+    TOKEN: ${{ secrets.GITEE_TOKEN }}
+    OWNER: ${{ vars.GITEE_OWNER }}
+    REPO: ${{ vars.GITEE_REPO }}
+    BRANCH: ${{ vars.GITEE_BRANCH }}
+  steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: <artifact-name>
+        path: dist
+
+    - name: Self-check
+      run: |
+        set -euo pipefail
+        [ -n "$TOKEN" ] || { echo "::error::missing GITEE_TOKEN"; exit 1; }
+        ls dist/<asset-glob> dist/<asset-glob>.sha256 >/dev/null \
+          || { echo "::error::artifact incomplete"; exit 1; }
+
+    - name: Create release and upload attachments
+      run: |
+        set -euo pipefail
+        API="https://gitee.com/api/v5/repos/$OWNER/$REPO/releases"
+
+        # 幂等：返回不是数组说明令牌/权限有问题；同名一律拒绝
+        existing=$(curl -sS "$API?access_token=$TOKEN&per_page=100")
+        printf '%s' "$existing" | jq -e 'type == "array"' >/dev/null \
+          || { echo "::error::cannot list releases: $existing"; exit 1; }
+        printf '%s' "$existing" | jq -e --arg t "$TAG" 'any(.[]; .tag_name == $t)' >/dev/null \
+          && { echo "::error::$TAG exists, refuse to overwrite"; exit 1; } || true
+
+        id=$(curl -sS -X POST "$API" \
+          --data-urlencode "access_token=$TOKEN" \
+          --data-urlencode "tag_name=$TAG" \
+          --data-urlencode "name=$TAG" \
+          --data-urlencode "target_commitish=$BRANCH" \
+          --data-urlencode "prerelease=false" | jq -r '.id // empty')
+        [ -n "$id" ] || { echo "::error::create failed"; exit 1; }
+
+        for f in dist/*; do
+          url=$(curl -sS -X POST "$API/$id/attach_files" \
+            -F "access_token=$TOKEN" -F "file=@$f" | jq -r '.browser_download_url // empty')
+          [ -n "$url" ] || { echo "::error::upload failed: $f"; exit 1; }
+        done
+
+        # 附件全部成功之后才写清单：清单是「发布完成」的唯一切换点（第 2 节第 4 条）
+```
 
 ## 6. API 速查
 
@@ -72,7 +131,7 @@
 | 最新 Release | `GET /releases/latest` | 返回**最后创建**的，不是语义版本最高的 |
 | 令牌自检 | `GET https://gitee.com/api/v5/user` | 完整路径，不含 repos 前缀 |
 
-- **【默认】`latest` 不能当版本排序用**：平台没有「设为 latest」的 API，别补发旧版本；客户端自己再比一次版本号并保留 GitHub 回退链路。
+- **【默认】`latest` 只作人工核对，不做客户端数据源**：它返回「最后创建」而不是语义最高，匿名请求还会被限流返回 403。客户端改读静态清单，并自己再比一次版本号、保留 GitHub 回退链路；别补发旧版本。
 - **【默认】按状态码定位**：`401` 令牌无效 / 过期，`404` owner/repo 写错或令牌无该仓库权限，`422` 同名 tag 或参数不合法，`413` 附件超限。
 - **【默认】额度按官方帮助页实测**：单附件与仓库附件总量都有限额，总量含仓库附件；接近上限时清理旧 Release 附件，别把产物提交进 git。
 
@@ -90,8 +149,8 @@
 
 - [ ] 两端 Release 同名 tag，附件文件名与数量一致，均可下载
 - [ ] 两端哈希一致且与 `.sha256` 相符；需要签名的产物证书指纹一致
-- [ ] `GET /releases/latest` 返回的 `tag_name` 是本次版本且带附件
-- [ ] 客户端「检查更新」命中镜像源并能调起安装器；镜像不可用时能回退 GitHub
+- [ ] 清单的 `version` / `tag` 等于本次 tag，下载地址指向刚上传的附件——**清单才是「发布完成」的判据**
+- [ ] 客户端「检查更新」命中镜像源并能调起安装器；「制品未就绪」时只提示同步中、不渲染下载按钮，镜像完全不可用时能回退 GitHub
 
 - **【默认】未验证项如实记录**：CI 只保证附件上传成功，下载 URL 在真实国内网络下能否免登录直连，要首次发版后真机端到端验证。
 - **【默认】验证用的 `curl` 一律加 `-L` 并打印最终地址**：平台常把 `raw` 路径 302 到 CDN，不加 `-L` 拿到的是重定向页（一小段 HTML），很容易误判成「清单损坏」。

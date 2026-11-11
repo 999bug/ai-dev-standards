@@ -178,7 +178,7 @@ bash scripts/check.sh
 | `.agents/legacy.md` | 接手老项目、重构巨型类 | 体检 grep、找接缝、迁移只搬不改、验收清单 |
 | `.agents/task-workflow.md` | 跨多次会话、要拆子任务、接手半成品 | 何时写 spec/plan、模板、台账与交接、子代理任务书与报告 |
 | `.agents/lang-*.md` | 改对应语言时 | Java（版本特性、导入与命名、并发、超时、缓存）/ Kotlin-Android（版本基线、四层验证、Room 迁移、设备观察、字体缩放与 `wm size` 换算）/ Python / Vue 的坑，通用纪律不重复 |
-| `.agents/release-*.md` | 发版、改镜像、打 APK、同步国内分发 | GitHub Actions 与 Docker 的发布、回滚、失败分阶段补救、CI 回写版本号的边界；Android 的签名、版本号、APK 校验、升级策略与「版本可用 ≠ 制品可用」；Gitee Release 附件的镜像、校验与失败补传 |
+| `.agents/release-*.md` | 发版、改镜像、打 APK、同步国内分发 | GitHub Actions 与 Docker 的发布、回滚、失败分阶段补救、CI 回写版本号的边界；Android 的签名、版本号、APK 校验、升级策略与「版本可用 ≠ 制品可用」；Gitee Release 附件的镜像、校验、清单判据与失败补传 |
 | `CLAUDE.md` | Claude Code 会话 | 一行 `@AGENTS.md`，让只认 CLAUDE.md 的工具读到同一份规范 |
 | `.agents/.standards-version` | 升级时 | 版本与每个文件的 sha256，`--upgrade` 据此保留你的改动 |
 | `scripts/check.sh` | 按需（`--with-check`） | 七项自检；CI 也调用它 |
@@ -193,7 +193,9 @@ bash scripts/check.sh
 
 完整操作手册单独一份，留在规范仓库、不装进目标项目：**[references/gitee-release-sync.md](references/gitee-release-sync.md)**。里面有可直接搬走的镜像 job 模板、参数替换表、Gitee OpenAPI 速查、Git Bash 与 PowerShell 两套人工补传脚本、验证清单、高频坑与迁移 Checklist。
 
-手册解决的核心误区：平台的「仓库镜像」只同步分支、标签和提交，**不含 Release 附件**；附件必须由 CI 复用同一份 artifact、调 API 单独上传。
+装进项目的模块自带一段压缩骨架（自检 → 幂等 → 建 Release → 传附件 → 最后写清单），只有规则也能写出形状对的 job；分工是「规则随项目走，模板留仓库」。
+
+这套流程的两个核心误区：平台的「仓库镜像」只同步分支、标签和提交，**不含 Release 附件**，附件必须由 CI 复用同一份 artifact、调 API 单独上传；以及「Release 建好就算发完了」——附件还在传的窗口期里最新版已经可见，所以**清单最后写，清单才是发布完成的判据**，客户端也只读清单（`releases/latest` 匿名请求会被限流）。
 
 ## 许可
 
