@@ -174,11 +174,11 @@ bash scripts/check.sh
 | `.agents/project-profile.md` | 每次会话 | 项目事实，唯一必改的文件；已有 `/init` 产物时可自动生成初稿 |
 | `.agents/commit.md` | 写 commit、定分支、打 tag | 类型与单号、三段式格式、粒度禁令、分支与 Tag |
 | `.agents/discipline.md` | 提交、碰凭据、收尾 | Git 红线、匿名与脱敏、自测闭环、多会话并行 |
-| `.agents/integration.md` | 对接外部系统、调 SDK | HTTP 200 陷阱、签名与编码、时间戳单位、断线缓冲 |
+| `.agents/integration.md` | 对接外部系统、调 SDK | HTTP 200 陷阱、响应类型与「不存在」形态、验证口径、签名与编码、时间戳单位、断线缓冲 |
 | `.agents/legacy.md` | 接手老项目、重构巨型类 | 体检 grep、找接缝、迁移只搬不改、验收清单 |
 | `.agents/task-workflow.md` | 跨多次会话、要拆子任务、接手半成品 | 何时写 spec/plan、模板、台账与交接、子代理任务书与报告 |
-| `.agents/lang-*.md` | 改对应语言时 | Java（版本特性、导入与命名、并发、超时、缓存）/ Kotlin-Android（版本基线、四层验证、Room 迁移、设备观察）/ Python / Vue 的坑，通用纪律不重复 |
-| `.agents/release-*.md` | 发版、改镜像、打 APK、同步国内分发 | GitHub Actions 与 Docker 的发布、回滚、双推国内 registry 的门禁与兼容；Android 的签名、版本号、APK 校验与升级策略；Gitee Release 附件的镜像、校验与失败补传 |
+| `.agents/lang-*.md` | 改对应语言时 | Java（版本特性、导入与命名、并发、超时、缓存）/ Kotlin-Android（版本基线、四层验证、Room 迁移、设备观察、字体缩放与 `wm size` 换算）/ Python / Vue 的坑，通用纪律不重复 |
+| `.agents/release-*.md` | 发版、改镜像、打 APK、同步国内分发 | GitHub Actions 与 Docker 的发布、回滚、失败分阶段补救、CI 回写版本号的边界；Android 的签名、版本号、APK 校验、升级策略与「版本可用 ≠ 制品可用」；Gitee Release 附件的镜像、校验与失败补传 |
 | `CLAUDE.md` | Claude Code 会话 | 一行 `@AGENTS.md`，让只认 CLAUDE.md 的工具读到同一份规范 |
 | `.agents/.standards-version` | 升级时 | 版本与每个文件的 sha256，`--upgrade` 据此保留你的改动 |
 | `scripts/check.sh` | 按需（`--with-check`） | 七项自检；CI 也调用它 |
@@ -206,4 +206,4 @@ ai-dev-standards by saul, licensed under CC BY 4.0 (docs) and MIT (scripts)
 https://github.com/999bug/ai-dev-standards
 ```
 
-last-verified: 2026-11-10
+last-verified: 2026-11-11

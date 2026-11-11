@@ -76,6 +76,8 @@ gh secret set SIGNING_KEYSTORE_PASSWORD --body ([Net.NetworkCredential]::new("",
 
 - **【红线】`versionCode` 单调递增**。它是 Android 判断新旧的唯一依据，必须是整数；`versionName` 只给人看。
 - **【默认】`versionName` 与 git tag 对齐**（tag `v1.2.3` ↔ `versionName 1.2.3`），否则用户报障时对不上号。
+- **【红线】应用内更新日志是编译进 APK 的静态列表，CI 递增版本号不会替它补条目**。构建前校验「更新日志首条 == 本次要发的版本号」，不一致直接失败——否则用户装上新版，看到的还是上一版的说明。
+- **【默认】版本号由 CI 从最高 tag 推导时，人不要再手改构建文件**。手改会和已发布 tag 脱节，下一次自动递增又从老值算起。
 - **【红线】不复用版本号或 tag**。`gh release upload --clobber` 会让同一个版本号对应两份不同内容。
 - **【红线】不做「降级安装」**：Android 不允许安装更低 `versionCode` 的包。所谓回滚，是发一个 `versionCode` 更大的旧功能版本。
 
@@ -91,7 +93,7 @@ gh secret set SIGNING_KEYSTORE_PASSWORD --body ([Net.NetworkCredential]::new("",
 6. 创建 Release，上传 APK 与 `.sha256` 两个附件
 
 - **【红线】先验签再上传**。顺序反了等于把未签名包推到用户手里。
-- **【默认】用 `workflow_dispatch` 手动触发**，参数是版本号；不要每次 push 都产出一个 Release。
+- **【默认】用 `workflow_dispatch` 手动触发**；版本号可手填（跳 minor / major 时）或留空由 CI 按最高 tag + patch+1 递增。不要每次 push 都产出一个 Release。
 - **【默认】发布流水线的 `concurrency` 设 `cancel-in-progress: false`**，发版不能互相打断。
 
 ## 6. 产物与校验
@@ -176,15 +178,27 @@ installer.openSession(sessionId).use { session ->
 - **【默认】接受系统弹确认框**：普通应用无法静默安装（那是设备所有者 / 系统应用的能力）。弹框是正常流程，不是失败。
 - **【默认】每次都要重新检查授权**：用户随时可能在系统设置里关掉「安装未知应用」。
 
+### 版本可用 ≠ 制品可用
+
+第三方 `latest` 返回的是「发布意图」，不是「可下载事实」：Release 可能刚建好、附件还在逐个上传，或附件根本没传成功。
+
+- **【红线】客户端必须区分三态**：**没拿到版本信息** / **有版本但制品未就绪（可重试）** / **源不可用**。三者的文案与交互不能混用；最糟的中间态是「提示有新版本，却没有下载按钮」或「点下去在下另一个源的包」。
+- **【默认】就绪判据取「最后上传的那个文件」**：`assets` 同时含安装包与 `.apk.sha256` 才算就绪（校验文件后传，可当完成标记）。未就绪就退避重查，别因此回退到更差的源。
+- **【红线】「暂时没准备好」不能和「源不可用」共用一个兜底分支**。共用会把用户导流去跨境下载几十 MB，比「检查不到更新」更糟。
+- **【默认】唯一主源 / 唯一分发通道的替换，第一次单独发一版灰度验证**，不与功能发布捆在一起——新链路的写入步骤从没在真实 CI 跑过，第一次失败概率最高。
+- **【默认】判断「有没有新版本」的请求不走任何可缓存层**：文件 CDN 的 `raw` 路径缓存时长不可控，加时间戳并 `useCaches = false`，否则发完版客户端可能长时间读到旧版本。
+
 ## 9. 发布前检查清单
 
 - [ ] 四个签名 secret 齐备，keystore 有离机备份
 - [ ] `versionCode` 递增，`versionName` 与 tag 一致
+- [ ] 应用内更新日志首条 == 本次版本号
 - [ ] `./gradlew :app:testDebugUnitTest :app:assembleDebug` 本地通过
 - [ ] 改了表：`version` 已升、`Migration` 已写、迁移测试通过、schema 已入库
 - [ ] 真机做过一次「旧版 → 新版」覆盖安装，数据完整
 - [ ] 流水线验签通过，没有 debug 证书
 - [ ] Release 附件可下载，本地 `Get-FileHash` 或 `sha256sum -c` 与 `.sha256` 一致
+- [ ] 上一版客户端实机点一次「检查更新」：能看到新版本，且点下去真能下、能装上
 - [ ] README / CHANGELOG / 文档里的版本号已同步
 - [ ] 回滚方案已写：发一个更高 `versionCode` 的回退版本
 

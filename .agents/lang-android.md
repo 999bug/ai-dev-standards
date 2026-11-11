@@ -44,7 +44,8 @@ adb logcat --pid=$(adb shell pidof <applicationId>) # 只看自己的进程
 adb exec-out screencap -p > shot.png                # 截图
 ```
 
-- **【红线】Git Bash（MSYS）下不要用 `adb shell screencap -p /sdcard/x.png` 再 pull**：`/sdcard` 会被当成 Windows 路径转换，报 `Error opening file: D:/.../sdcard/x.png`。用 `exec-out` 重定向。
+- **【红线】Git Bash（MSYS）给原生 exe 传以 `/` 开头的设备侧路径，必须加 `MSYS_NO_PATHCONV=1`**。MSYS 会把 `/sdcard/x.png`、`/data/local/tmp/x.db` 改写成 `D:/...`，现象是 `Error opening file: D:/.../sdcard/x.png` 或 `cannot stat`。`adb shell screencap -p /sdcard/x.png`、`adb push`、`adb shell run-as … cat /data/…` 都会中招；`adb exec-out … > 本地文件` 不走参数转换，不受影响，所以截图优先用 `exec-out`。
+- **【默认】`wm size` 改的是像素，不是 dp**。先用 `adb shell wm density` 读 density，按「目标 dp = 像素 ÷ (density / 160)」换算再设。直接 `wm size 1200x800` 在 density 2.625 的机器上只有约 457dp——比 `widthIn(max = 640.dp)` 还窄，约束根本不触发，你会误判成「限宽没生效」。验完 `wm size reset`、`settings put system font_scale 1.0` 还原，别把模拟器留在变形状态。
 - **【默认】模拟器卡死（截图不更新、`adb shell` 超时）先重启模拟器，不要反复 `adb reboot`**：
 
 ```bash
@@ -73,7 +74,10 @@ adb exec-out run-as <applicationId> cat databases/<db>.db-wal > local.db-wal
 
 ## 5. Compose 与资源
 
-- **【默认】改界面要两个维度各看一次**：窄屏（约 360dp）与深色模式。只在大屏浅色下点过，等于没验。
+- **【默认】改界面要三个维度各看一次**：窄屏（约 360dp）、深色模式、**200% 字体**。只在大屏浅色常规字号下点过，等于没验。
+- **【红线】「文字行数 × 字体缩放」的容器不要写死 `height`**。`sp` 随系统 `fontScale` 放大而 `dp` 不变，两行文字超出固定高度就被 `clip` 裁掉；把 48dp 加到 72dp 只是把裁切入场推后，200% 下照样切。用 `heightIn(min = …)` 让内容自己撑高，或按 `LocalDensity.current.fontScale > 1.3f` 分档（分段控件抬高度、多列改单列、`Row(SpaceBetween)` 改上下堆叠）；Canvas 轴标签的留白按 `sp.toPx()` 算，不写死 dp。
+- **【默认】横向滚动的 chips 只保证「能滑到」，不保证「首屏完整可见」**。字号放大后前几项已占满一行，用户看到的是被裁掉的半截——枚举项 ≤ 4 且文案短时优先分行展示。
+- **【默认】验收命令**：`adb shell settings put system font_scale 2.0` 后截图，验完改回 `1.0`。
 - **【默认】截图留证**，交付说明里能贴就贴；「我点过了，没问题」不算证据。
 - **【默认】改图标或应用名后卸载重装再确认**。启动器有图标缓存，覆盖安装经常显示旧图标。
 - **【默认】权限变更后用 `aapt2 dump badging <apk>` 核对实际声明**。Manifest 合并会把依赖库的权限一起并进来——你可能凭空多出定位、网络权限。
@@ -83,7 +87,7 @@ adb exec-out run-as <applicationId> cat databases/<db>.db-wal > local.db-wal
 | 改动 | 必验 | 容易漏 |
 | --- | --- | --- |
 | 时间 / 时区换算 | L2 单测；跨午夜、跨时区各一例 | 算错不抛异常，只会让统计默默错 |
-| Compose 界面 / 导航 | L3 手动走一遍 + 截图 | 深色模式、窄屏 |
+| Compose 界面 / 导航 | L3 手动走一遍 + 截图 | 深色模式、窄屏、200% 字体 |
 | Room 实体 / 字段 | 先升版本 + 写迁移，再 L3 | 不写迁移 = 升级用户启动崩溃 |
 | 图标 / 资源 / Manifest | `installDebug` 后看桌面；`aapt2 dump badging` 看权限 | 图标有桌面缓存 |
 | Gradle 脚本 / 依赖 | `clean` 后全量构建 | 增量构建掩盖依赖解析问题 |
@@ -94,7 +98,7 @@ adb exec-out run-as <applicationId> cat databases/<db>.db-wal > local.db-wal
 - [ ] 改了逻辑就补了对应单测并通过（不是「应该没问题」）
 - [ ] 主路径在模拟器或真机上手动走过
 - [ ] 碰了数据库：Database Inspector 里确认数据真的落盘
-- [ ] 碰了界面：窄屏与深色模式各截一张图
+- [ ] 碰了界面：窄屏、深色模式、200% 字体各截一张图
 - [ ] 工作区干净：没有调试 `println`、临时脚本、`build/` 产物进库
 
 ## 8. 反例清单
