@@ -1,117 +1,79 @@
 #!/usr/bin/env bash
 #
-# 把 AI 开发规范装到目标项目。
+# AI 开发规范：全局装一次，项目只初始化一次。
 #
-# 本脚本就在仓库根目录，clone 下来直接跑即可，不需要先复制任何文件。
-# Claude Code 插件用户不用手动跑它：插件提供了 /ai-dev-standards:install 命令。
+# 两种模式：
+#   ./install.sh --global [--upgrade]    把规范装到全局目录（默认 ~/.ai-dev-standards）
+#   ./install.sh [目标目录]               初始化项目（默认当前目录）
 #
-# 用法：
-#   ./install.sh [目标目录] [选项]
+# 全局目录装什么：AGENTS.md + .agents/ 全部模块 + scripts/ + templates/
+# 项目初始化装什么：AGENTS.md（指针）、CLAUDE.md（一行）、
+#                  .agents/project-profile.md、.git/hooks/ 下两个钩子
 #
 # 选项：
-#   --minimal       只装 AGENTS.md + .agents/（项目根只多 2 个条目，不装钩子）
-#                   适合不用 Claude Code 的场景；与 --with-check / --with-ci / --no-hooks 互斥
-#   --no-hooks      不装 git 钩子（默认是装的）
-#   --with-check    额外装 scripts/check.sh（七项自检）
-#   --with-ci       额外装 .github/workflows/check.yml；会自动带上 scripts/check.sh，
-#                   因为 CI 里跑的就是那个脚本
-#   --upgrade       升级已装的规范：只覆盖「装完之后没被改过」的文件，
-#                   改过的另存为 <文件>.new，不动你的修改
-#   --all-modules   不裁剪，.agents/ 下的模块全装（旧行为）
-#   --modules=a,b   只装指定的模块（文件名，不带路径），如 --modules=commit.md,lang-java.md
-#   --shared-hooks  钩子写进项目的 .githooks/ 并设置 core.hooksPath，
-#                   这样钩子跟仓库一起提交，团队 clone 后直接生效
-#   --force         覆盖已存在的文件（危险，先确认）
+#   --global        装到全局目录，不碰任何项目
+#   --upgrade       升级已装的全局目录（隐含 --global）
+#   --no-hooks      项目初始化时不装 git 钩子
+#   --force         覆盖已存在的文件（连备份也不做判断，危险）
 #   --dry-run       只打印将要做什么，不落盘
+#   -h, --help      显示本帮助
 #
-# 默认按项目裁剪模块（不用 --all-modules 时）：
-#   - lang-android 只在探测到 AndroidManifest.xml 时装（它同时带 release-android，
-#     因为出签名 APK 是必经步骤），此时不再装 lang-java
-#   - lang-java / lang-python / lang-vue 只在探测到对应语言时装
-#   - release-github 只在用了 GitHub（workflows 或 github remote）时装
-#   - release-gitee 只在探测到 Gitee 分发镜像（workflow 调 Gitee API / 用 GITEE_TOKEN，
-#     或存在 gitee 远端）时装，并连带 release-github
-#   - release-docker 只在有 Dockerfile / compose 时装
-#   跨语言的四件（project-profile、commit、discipline、task-workflow）和方法论两件
-#   （integration、legacy）始终装。AGENTS.md 的分流表会同步删掉未装模块的行，
-#   不留悬空引用。
+# 环境变量：
+#   AI_DEV_STANDARDS_HOME   全局目录位置，默认 ~/.ai-dev-standards
 #
-# 钩子默认装到 .git/hooks/（git 默认位置），不占项目根目录条目，也不需要
-# core.hooksPath。代价是它不进版本控制：别人 clone 后要各自装一次。
-# 想让门禁跟着仓库走，用 --shared-hooks。
+# 全局目录可以就是本仓库（git clone 到 ~/.ai-dev-standards），这时不复制文件，
+# 升级用 git pull，install.sh 只负责刷新清单。
 #
-# 分级（项目根目录新增的条目数）：
-#   --minimal                       2 个：AGENTS.md、.agents/
-#   （默认）                        3 个：再加 CLAUDE.md
-#                                  另有 .git/hooks/ 下的两个钩子（不计入根目录）
-#   + --with-check                  4 个：再加 scripts/
-#   + --with-ci                     5 个：再加 .github/workflows/
+# 升级语义：
+#   全局：hash 与清单一致（装完没被改过）→ 覆盖；不一致（你改过）→
+#         先备份到 .backup/<时间戳>/ 再覆盖，汇总里列出备份位置
+#   项目：永不覆盖 project-profile.md；AGENTS.md / CLAUDE.md 只在
+#         「内容与模板相同」或「确认是我们以前写的指针」时更新
 #
-# 安装清单写在 .agents/.standards-version，记录版本与每个文件的 sha256。
-# --upgrade 靠它区分「安装器写的」和「你改过的」，所以别手改这个文件。
-#
-# 例子：
-#   ./install.sh ~/code/my-project --dry-run
-#   ./install.sh ~/code/my-project --minimal
-#   ./install.sh ~/code/my-project --upgrade
-#   ./install.sh ~/code/my-project --with-check --with-ci
-#
-# 设计原则：不覆盖已存在的文件。目标项目可能已经改过 AGENTS.md 或某个模块，
-# 直接覆盖等于抹掉别人的工作。要覆盖必须显式加 --force。
-# 升级走 --upgrade：hash 对得上才覆盖，对不上就另存 .new。
-# 钩子是例外：装了才生效，所以已有同名钩子会先备份再覆盖。
+# 1.13.0 起不再支持 --minimal / --with-check / --with-ci / --all-modules /
+# --modules= / --shared-hooks：模块全量装进全局目录，项目侧不再有副本，
+# 这套裁剪与项目级门禁的开关失去意义。命中旧参数会明确报错，不静默忽略。
 
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+GLOBAL_HOME="${AI_DEV_STANDARDS_HOME:-$HOME/.ai-dev-standards}"
+case "$GLOBAL_HOME" in
+    '~')   GLOBAL_HOME="$HOME" ;;
+    '~/'*) GLOBAL_HOME="$HOME/${GLOBAL_HOME#\~/}" ;;
+esac
+
+mode="project"
 target="."
-with_ci=0
-with_hooks=1          # 默认装钩子
-with_check=0          # 默认不装自检脚本
-minimal=0
+upgrade=0
+no_hooks=0
 force=0
 dry=0
-upgrade=0
-all_modules=0
-only_modules=""
-hooks_mode="local"    # local = .git/hooks/；shared = .githooks/ + core.hooksPath
 
 for arg in "$@"; do
     case "$arg" in
-        --minimal)      minimal=1 ;;
-        --no-hooks)     with_hooks=0 ;;
-        --with-hooks)   with_hooks=1 ;;   # 兼容旧写法，已是默认行为
-        --with-check)   with_check=1 ;;
-        --with-ci)      with_ci=1 ;;
-        --upgrade)      upgrade=1 ;;
-        --all-modules)  all_modules=1 ;;
-        --modules=*)    only_modules="${arg#--modules=}" ;;
-        --shared-hooks) hooks_mode="shared" ;;
-        --force)        force=1 ;;
-        --dry-run)      dry=1 ;;
-        -h|--help)      awk 'NR==1{next} /^#/{sub(/^# ?/,""); if ($0 == "" && !shown) next; shown=1; print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
-        -*)             echo "未知选项: $arg" >&2; exit 2 ;;
-        *)              target="$arg" ;;
+        --global)    mode="global" ;;
+        --project)   mode="project" ;;
+        --upgrade)   upgrade=1; mode="global" ;;
+        --no-hooks)  no_hooks=1 ;;
+        --force)     force=1 ;;
+        --dry-run)   dry=1 ;;
+        --minimal|--with-check|--with-ci|--all-modules|--shared-hooks)
+            echo "1.13.0 起不再支持 $arg。" >&2
+            echo "模块现在全量装进全局目录，项目侧只初始化 3 个文件，不需要裁剪或项目级门禁开关。" >&2
+            echo "用法：./install.sh --global 装一次；之后在项目里跑 ./install.sh" >&2
+            exit 2 ;;
+        --modules=*)
+            echo "1.13.0 起不再支持 --modules：全局目录全量安装，不再按项目裁剪。" >&2
+            exit 2 ;;
+        -h|--help)
+            awk 'NR==1{next} /^#/{sub(/^# ?/,""); if ($0 == "" && !shown) next; shown=1; print; next} {exit}' "${BASH_SOURCE[0]}"
+            exit 0 ;;
+        -*) echo "未知选项: $arg" >&2; exit 2 ;;
+        *)  target="$arg" ;;
     esac
 done
-
-# CI 里跑的就是 scripts/check.sh，要装 CI 就必须带上它
-if [ "$with_ci" -eq 1 ]; then
-    with_check=1
-fi
-
-if [ "$minimal" -eq 1 ] && { [ "$with_ci" -eq 1 ] || [ "$with_check" -eq 1 ] || [ "$with_hooks" -eq 0 ]; }; then
-    echo '--minimal 与 --with-check / --with-ci / --no-hooks 互斥。' >&2
-    echo '--minimal 本身就是「只装核心」，不需要再叠加这些开关。' >&2
-    exit 2
-fi
-
-if [ ! -d "$target" ]; then
-    echo "目标目录不存在: $target" >&2
-    exit 1
-fi
-target="$(cd "$target" && pwd)"
 
 if [ ! -f "$REPO_ROOT/AGENTS.md" ] || [ ! -d "$REPO_ROOT/.agents" ]; then
     echo "找不到模板文件，确认本脚本位于 ai-dev-standards 仓库根目录。" >&2
@@ -119,41 +81,300 @@ if [ ! -f "$REPO_ROOT/AGENTS.md" ] || [ ! -d "$REPO_ROOT/.agents" ]; then
     exit 1
 fi
 
-if [ "$target" = "$REPO_ROOT" ]; then
-    echo "目标目录就是本仓库，跳过。" >&2
-    exit 1
-fi
-
-# 版本号只有一个来源：插件清单。--upgrade 靠它写进安装清单。
+# 版本号只有一个来源：插件清单
 VERSION=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
     "$REPO_ROOT/.claude-plugin/plugin.json" 2>/dev/null | head -1)
 [ -n "$VERSION" ] || VERSION="unknown"
 
-manifest="$target/.agents/.standards-version"
+log() { printf '%s\n' "$*"; }
 
-# ---------- 模块裁剪：只装和这个项目有关的规范 ----------
-# 跨语言、任何项目都用得上：项目档案、提交规范、纪律、任务工作流、外部对接、老系统方法论
-ALWAYS_MODULES="project-profile.md commit.md discipline.md task-workflow.md integration.md legacy.md"
-
-wanted=""
-add_wanted() {
-    case " $wanted " in *" $1 "*) return 0 ;; esac
-    wanted="${wanted:+$wanted }$1"
-}
-is_wanted() {
-    case " $wanted " in *" $1 "*) return 0 ;; *) return 1 ;; esac
+# 三平台兜底：Git Bash / macOS / 只有 openssl 的环境
+sha() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" 2>/dev/null | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" 2>/dev/null | awk '{print $1}'
+    else
+        openssl dgst -sha256 "$1" 2>/dev/null | awk '{print $NF}'
+    fi
 }
 
-# 复用 profile 的探测脚本，避免安装器和 /ai-dev-standards:profile 各判断一套
-facts=""
-if [ -f "$REPO_ROOT/scripts/detect-profile.sh" ]; then
-    facts=$(bash "$REPO_ROOT/scripts/detect-profile.sh" "$target" 2>/dev/null)
+stamp=$(date +%Y%m%d-%H%M%S)
+
+# ============================================================================
+# 全局模式
+# ============================================================================
+if [ "$mode" = "global" ]; then
+    ghome="$GLOBAL_HOME"
+
+    # 用物理路径比较：Windows 下 F:/x 与 /f/x 是同一个目录，字符串比会失手
+    same_place=0
+    if [ -d "$ghome" ]; then
+        ghome_phys=$(cd "$ghome" 2>/dev/null && pwd)
+        [ -n "$ghome_phys" ] && [ "$ghome_phys" = "$REPO_ROOT" ] && same_place=1
+    fi
+
+    if [ -d "$ghome" ] && [ "$same_place" -eq 0 ] && [ ! -w "$ghome" ]; then
+        echo "全局目录不可写: $ghome" >&2
+        exit 1
+    fi
+
+    manifest="$ghome/.standards-version"
+
+    recorded() {
+        [ -f "$manifest" ] || return 0
+        awk -v p="$1" '$1 == "file" && $2 == p { h = $3; sub(/\r$/, "", h); print h; exit }' "$manifest" 2>/dev/null
+    }
+
+    files=()
+    files+=("AGENTS.md")
+    for f in "$REPO_ROOT"/.agents/*.md; do
+        [ -e "$f" ] && files+=(".agents/$(basename "$f")")
+    done
+    files+=("scripts/check.sh")
+    files+=("scripts/detect-profile.sh")
+    files+=("templates/githooks/commit-msg")
+    files+=("templates/githooks/post-commit")
+    files+=("templates/project/AGENTS.md")
+    files+=("templates/project/CLAUDE.md")
+    files+=("templates/github/check.yml")
+
+    new_count=0
+    upd_count=0
+    skip_count=0
+    backup_count=0
+    skip_list=""
+    backup_list=""
+    managed=()
+    preserved=()
+
+    put_global() {  # src rel
+        local src="$1" rel="$2" dst="$ghome/$rel" rec
+
+        if [ ! -e "$dst" ]; then
+            if [ "$dry" -eq 1 ]; then
+                log "  [预览] 新增 $rel"
+            elif ! { mkdir -p "$(dirname "$dst")" && cp "$src" "$dst"; }; then
+                log "  ! 写入失败：$rel" >&2
+                return 0
+            fi
+            new_count=$((new_count + 1))
+            managed+=("$rel")
+            return 0
+        fi
+
+        if cmp -s "$src" "$dst"; then
+            skip_count=$((skip_count + 1))
+            managed+=("$rel")
+            return 0
+        fi
+
+        # 内容不同：判断是「旧版」还是「用户改过」
+        rec=$(recorded "$rel")
+        untouched=0
+        if [ "$force" -eq 1 ] || [ "$upgrade" -eq 0 ]; then
+            untouched=1
+        elif [ -n "$rec" ] && [ "$rec" = "$(sha "$dst")" ]; then
+            untouched=1
+        fi
+
+        if [ "$untouched" -eq 1 ]; then
+            if [ "$dry" -eq 1 ]; then
+                log "  [预览] 更新 $rel"
+            else
+                mkdir -p "$(dirname "$dst")" && cp "$src" "$dst"
+            fi
+            upd_count=$((upd_count + 1))
+            managed+=("$rel")
+            return 0
+        fi
+
+        # 用户改过：备份后覆盖。全局目录是安装产物，不是工作区；
+        # 真要定制应该写进项目的 profile overrides，而不是改全局模块。
+        if [ "$dry" -eq 1 ]; then
+            log "  [预览] 你改过 $rel → 备份到 .backup/$stamp/ 后覆盖"
+            upd_count=$((upd_count + 1))
+            managed+=("$rel")
+            return 0
+        fi
+
+        bdir="$ghome/.backup/$stamp"
+        if mkdir -p "$bdir/$(dirname "$rel")" 2>/dev/null && cp "$dst" "$bdir/$rel" 2>/dev/null; then
+            backup_count=$((backup_count + 1))
+            backup_list="$backup_list $rel"
+            cp "$src" "$dst"
+            upd_count=$((upd_count + 1))
+            managed+=("$rel")
+        else
+            log "  ! 备份失败，保留原文件：$rel" >&2
+            skip_count=$((skip_count + 1))
+            skip_list="$skip_list $rel"
+            [ -n "$rec" ] && preserved+=("$rel $rec")
+        fi
+    }
+
+    log "模板来源: $REPO_ROOT"
+    log "全局目录: $ghome"
+    log "规范版本: $VERSION"
+    log ""
+
+    if [ "$same_place" -eq 1 ]; then
+        log "1. 全局规范"
+        log "  全局目录就是本仓库，不复制文件（升级用 git pull）。"
+        for rel in "${files[@]}"; do
+            [ -e "$ghome/$rel" ] || log "  ! 缺少 $rel" >&2
+            managed+=("$rel")
+            skip_count=$((skip_count + 1))
+        done
+    else
+        log "1. 全局规范"
+        for rel in "${files[@]}"; do
+            put_global "$REPO_ROOT/$rel" "$rel"
+        done
+    fi
+
+    # ---------- 清单 ----------
+    write_manifest() {
+        [ "$dry" -eq 1 ] && return 0
+        [ "${#managed[@]}" -eq 0 ] && return 0
+
+        local tmp src_kind
+        tmp="$(mktemp 2>/dev/null)" || return 0
+
+        src_kind="copy"
+        [ "$same_place" -eq 1 ] && src_kind="repo"
+        if [ "$same_place" -eq 0 ] && git -C "$ghome" rev-parse --git-dir >/dev/null 2>&1; then
+            src_kind="git"
+        fi
+
+        mkdir -p "$ghome"
+        {
+            printf '%s\n' "# ai-dev-standards 全局安装清单，install.sh 生成，不要手改。"
+            printf '%s\n' "# 用途：--upgrade 用这里的 sha256 判断文件是否被本地改过。"
+            printf 'version=%s\n' "$VERSION"
+            printf 'installed=%s\n' "$(date +%Y-%m-%d)"
+            printf 'source=%s\n' "$src_kind"
+            for rel in "${managed[@]}"; do
+                [ -f "$ghome/$rel" ] || continue
+                printf 'file %s %s\n' "$rel" "$(sha "$ghome/$rel")"
+            done
+            if [ "${#preserved[@]}" -gt 0 ]; then
+                for entry in "${preserved[@]}"; do
+                    printf 'file %s\n' "$entry"
+                done
+            fi
+        } > "$tmp"
+
+        # 用 mv 收尾：内容相同时直接覆盖也算「没变」，git 不会当成改动。
+        # 不用 rm —— 某些环境的 rm 被安全包装拦截，会刷一行没意义的报错。
+        cmp -s "$tmp" "$manifest" 2>/dev/null || cat "$tmp" > "$manifest"
+        mv -f "$tmp" "$manifest" 2>/dev/null || true
+    }
+
+    write_manifest
+
+    log ""
+    log "────────────────────────────"
+    log "写入 $new_count 个文件，更新 $upd_count 个，跳过 $skip_count 个已存在的文件"
+    if [ "$backup_count" -gt 0 ]; then
+        log "你改过的 $backup_count 个文件已备份到 $ghome/.backup/$stamp/"
+        for f in $backup_list; do log "  $f"; done
+    fi
+    if [ -n "$skip_list" ]; then
+        log "以下文件写入失败或被保留：$skip_list"
+    fi
+    [ "$dry" -eq 0 ] && [ -f "$manifest" ] && log "安装清单: $manifest（version=$VERSION）"
+    log ""
+    log "项目侧不需要升级：那里只有指针和 project-profile，内容固定。"
+    log "新项目初始化：cd <项目> && $REPO_ROOT/install.sh"
+    exit 0
 fi
+
+# ============================================================================
+# 项目模式
+# ============================================================================
+if [ ! -d "$target" ]; then
+    echo "目标目录不存在: $target" >&2
+    exit 1
+fi
+target="$(cd "$target" && pwd)"
+
+if [ "$target" = "$REPO_ROOT" ]; then
+    echo "目标目录就是本仓库，跳过。" >&2
+    echo "要装全局目录请用 --global；初始化别的项目请传项目路径。" >&2
+    exit 1
+fi
+
+if [ "$target" = "$GLOBAL_HOME" ]; then
+    echo "目标目录就是全局目录，不能在这里初始化项目。" >&2
+    exit 1
+fi
+
+if [ ! -f "$GLOBAL_HOME/AGENTS.md" ] || [ ! -d "$GLOBAL_HOME/.agents" ]; then
+    echo "全局规范未安装：$GLOBAL_HOME" >&2
+    echo "" >&2
+    echo "先装一次（所有项目共用）：" >&2
+    echo "  $REPO_ROOT/install.sh --global" >&2
+    echo "" >&2
+    echo "或用插件命令：/ai-dev-standards:install（它会先确保全局已装）" >&2
+    exit 1
+fi
+
+# ---------- 旧结构检测：只报告，不删任何文件 ----------
+legacy_modules=""
+legacy_other=""
+if [ -d "$target/.agents" ]; then
+    for f in "$target"/.agents/*.md; do
+        [ -e "$f" ] || continue
+        base=$(basename "$f")
+        [ "$base" = "project-profile.md" ] && continue
+        legacy_modules="$legacy_modules .agents/$base"
+    done
+fi
+[ -f "$target/.agents/.standards-version" ] && legacy_other="$legacy_other .agents/.standards-version"
+# 旧版的 AGENTS.md 是整份规范副本，带 last-verified；新指针里没有这一行
+if [ -f "$target/AGENTS.md" ] && grep -q '^last-verified:' "$target/AGENTS.md" 2>/dev/null; then
+    legacy_other="$legacy_other AGENTS.md"
+fi
+legacy_count=$(printf '%s\n' $legacy_modules $legacy_other | grep -c .)
+
+if [ -n "$legacy_modules$legacy_other" ]; then
+    log "目标项目: $target"
+    log ""
+    log "这个项目装的是 1.12.x 及更早的结构：规范副本在项目里，一共 ${legacy_count} 处。"
+    log "新结构下项目侧只留 AGENTS.md（指针）、CLAUDE.md 和 .agents/project-profile.md。"
+    log ""
+    log "需要清理的："
+    for f in $legacy_modules $legacy_other; do log "  $f"; done
+    log ""
+
+    # 只删我们自己装的模块，profile 和人写的文件必须留下
+    if git -C "$target" rev-parse --git-dir >/dev/null 2>&1; then
+        log "确认无误后执行（project-profile.md 不动）："
+        log "  cd \"$target\""
+        log "  git rm -q$legacy_modules$legacy_other"
+        log "  $REPO_ROOT/install.sh \"$target\""
+        log ""
+        log "  没提交过的文件 git rm 会报错，那就把 git rm -q 换成 rm -f。"
+    else
+        log "确认无误后执行（project-profile.md 不动）："
+        log "  cd \"$target\""
+        log "  rm -f$legacy_modules$legacy_other"
+        log "  $REPO_ROOT/install.sh \"$target\""
+    fi
+    log ""
+    log "本脚本没有删任何文件。清理完重跑一次即可。"
+    exit 0
+fi
+
+# ---------- 探测事实（给 profile 填初稿） ----------
+detect="$GLOBAL_HOME/scripts/detect-profile.sh"
+[ -f "$detect" ] || detect="$REPO_ROOT/scripts/detect-profile.sh"
+facts=""
+[ -f "$detect" ] && facts=$(bash "$detect" "$target" 2>/dev/null)
 has_fact() { printf '%s\n' "$facts" | grep -q "^$1="; }
 fact() { printf '%s\n' "$facts" | sed -n "s/^$1=//p" | head -1; }
 
-# 把探测到的事实写进 profile 初稿。只填「读得到」的字段；
-# type / visibility / verify_* 这类需要人确认或实跑的，留给 /ai-dev-standards:profile。
 set_field() {  # file key value
     [ -n "${3:-}" ] || return 0
     awk -v k="$2" -v v="$3" '
@@ -162,7 +383,6 @@ set_field() {  # file key value
     ' "$1" > "$1.seed" && mv "$1.seed" "$1"
 }
 
-# 语言块里的示例行要么启用成实际值，要么注释掉——留着示例值会被当成项目事实
 set_lang() {  # file key value [present]
     local p="$1" k="$2" v="$3" present="${4:-0}"
     if [ -n "$v" ]; then
@@ -172,7 +392,6 @@ set_lang() {  # file key value [present]
         ' "$p" > "$p.seed" && mv "$p.seed" "$p"
         set_field "$p" "  $k" "$v"
     elif [ "$present" = "1" ]; then
-        # 是这门语言，但版本没读到：保留「未定」让人填，别注释掉
         return 0
     else
         awk -v k="$k" '
@@ -182,7 +401,6 @@ set_lang() {  # file key value [present]
     fi
 }
 
-# 只替换某个键下面的第一条 "- 未定"
 set_list_first() {  # file key value
     [ -n "${3:-}" ] || return 0
     awk -v k="$2" -v v="$3" '
@@ -216,8 +434,7 @@ seed_profile() {
     set_field "$p" test_command "$(fact test_command)"
     set_field "$p" dev_command "$(fact dev_command)"
 
-    # 身份只在仓库自己配过身份时才写。否则拿到的是全局配置（可能是公司身份），
-    # 写进一个开源项目就错了，留给 /ai-dev-standards:profile 按 type 决定。
+    # 身份只在仓库自己配过身份时才写，避免把全局公司身份写进开源项目
     if [ "$(fact git_email_source)" = "local" ]; then
         set_field "$p" git_user_name "$(fact git_user_name)"
         if [ "$(fact git_email_noreply)" = "yes" ]; then
@@ -234,8 +451,6 @@ seed_profile() {
     printf '%s' "$(fact git_remote)" | grep -q github &&
         set_field "$p" issue_tracker "GitHub Issues"
 
-    # 部署目标：只写有证据的。有 Dockerfile 就是容器，什么都没有才是 none。
-    # 有 CI 但判断不出目标时留「未定」——写个错的比空着更糟。
     v=$(fact deploy_target)
     [ -n "$v" ] || { [ "$(fact pages)" = "yes" ] && v="pages"; }
     if [ -z "$v" ]; then
@@ -266,395 +481,209 @@ seed_profile() {
         set_field "$p" secrets_location "本地 .env"
     fi
 
-    # ai_scope：取第一个源码目录，跳过文档与测试目录
     v=$(printf '%s\n' "$facts" | sed -n 's/^dir=//p' | grep -vE '^(docs|tests|test)$' | head -1)
     set_list_first "$p" ai_scope "$v"
 
     set_list_first "$p" related_docs "$(fact doc)"
 }
 
-
-if [ "$all_modules" -eq 1 ]; then
-    for f in "$REPO_ROOT"/.agents/*.md; do
-        [ -e "$f" ] && add_wanted "$(basename "$f")"
-    done
-elif [ -n "$only_modules" ]; then
-    for m in $(printf '%s' "$only_modules" | tr ',' ' '); do
-        if [ ! -f "$REPO_ROOT/.agents/$m" ]; then
-            echo "未知模块: $m（可用模块见 .agents/ 目录）" >&2
-            exit 2
-        fi
-        add_wanted "$m"
-    done
-else
-    for m in $ALWAYS_MODULES; do add_wanted "$m"; done
-    # Android 优先：它天然是 Gradle 工程，不能被下面那条 Java 判断抢走。
-    # 探到 Android 就同时给发布模块——签名和 versionCode 是出 APK 的必经步骤。
-    if has_fact has_android_app; then
-        add_wanted lang-android.md
-        add_wanted release-android.md
-    elif has_fact lang_java || has_fact source_java_files; then
-        add_wanted lang-java.md
-    fi
-    if has_fact lang_python || has_fact source_python_files; then
-        add_wanted lang-python.md
-    fi
-    if has_fact lang_vue || has_fact source_vue_files; then
-        add_wanted lang-vue.md
-    fi
-    if has_fact workflow || printf '%s\n' "$facts" | grep -q '^git_remote=.*github'; then
-        add_wanted release-github.md
-    fi
-    # 镜像 job 必须挂在现有发布 workflow 后面，装 Gitee 规范时连带发布规范
-    if has_fact gitee_mirror; then
-        add_wanted release-github.md
-        add_wanted release-gitee.md
-    fi
-    if has_fact has_dockerfile || printf '%s\n' "$facts" | grep -q '^deploy_target=docker-compose'; then
-        add_wanted release-docker.md
-    fi
-fi
-
-skipped_modules=""
-for f in "$REPO_ROOT"/.agents/*.md; do
-    [ -e "$f" ] || continue
-    base=$(basename "$f")
-    is_wanted "$base" || skipped_modules="$skipped_modules $base"
-done
-
-# 没装的模块不能留在 AGENTS.md 的分流表里，否则 AI 会照表去读不存在的文件
-tmpdir=$(mktemp -d 2>/dev/null)
-agents_src="$REPO_ROOT/AGENTS.md"
-if [ -n "${tmpdir:-}" ] && [ -n "$skipped_modules" ]; then
-    cp "$REPO_ROOT/AGENTS.md" "$tmpdir/AGENTS.md"
-    for bad in $skipped_modules; do
-        # 只删表格行里点名该文件的行，正文里的引用保持原样
-        grep -vE "^\|.*\`${bad}\`" "$tmpdir/AGENTS.md" > "$tmpdir/next" 2>/dev/null || true
-        mv "$tmpdir/next" "$tmpdir/AGENTS.md"
-    done
-    agents_src="$tmpdir/AGENTS.md"
-fi
-
 new_count=0
 upd_count=0
 skip_count=0
-conflict_count=0
-skip_list=""
-conflict_list=""
-managed=()
-preserved=()
-profile_kept=0
-profile_existed=0
-[ -f "$target/.agents/project-profile.md" ] && profile_existed=1
+profile_created=0
+agents_custom=0
+claude_custom=0
 
-log() { printf '%s\n' "$*"; }
-
-# 三平台兜底：Git Bash / macOS / 只有 openssl 的环境
-sha() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" 2>/dev/null | awk '{print $1}'
-    elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$1" 2>/dev/null | awk '{print $1}'
-    else
-        openssl dgst -sha256 "$1" 2>/dev/null | awk '{print $NF}'
-    fi
-}
-
-# 安装清单里记录的、安装当时的 hash。没有清单或没记录就返回空。
-recorded() {
-    [ -f "$manifest" ] || return 0
-    awk -v p="$1" '$1 == "file" && $2 == p { h = $3; sub(/\r$/, "", h); print h; exit }' "$manifest" 2>/dev/null
-}
-
-write_file() {  # src dst
-    mkdir -p "$(dirname "$2")" && cp "$1" "$2"
-}
-
-put() {
-    local src="$1" dst="$2" rel rec
-    rel=${dst#"$target"/}
-
-    # 升级不动项目档案：里面是项目事实和你手填的结论，模板更新不该覆盖它
-    if [ "$upgrade" -eq 1 ] && [ "$rel" = ".agents/project-profile.md" ] && [ -e "$dst" ]; then
-        profile_kept=1
-        skip_count=$((skip_count + 1))
-        managed+=("$rel")
-        return 0
-    fi
-
-    # ---------- 目标不存在：新增 ----------
-    if [ ! -e "$dst" ]; then
-        if [ "$dry" -eq 1 ]; then
-            log "  [预览] 新增 $rel"
-        elif ! write_file "$src" "$dst"; then
-            log "  ! 写入失败：$rel" >&2
-            return 0
-        fi
-        new_count=$((new_count + 1))
-        managed+=("$rel")
-        return 0
-    fi
-
-    # ---------- --force：无条件覆盖 ----------
-    if [ "$force" -eq 1 ]; then
-        if [ "$dry" -eq 1 ]; then
-            log "  [预览] 覆盖 $rel"
-        else
-            write_file "$src" "$dst"
-        fi
-        upd_count=$((upd_count + 1))
-        managed+=("$rel")
-        return 0
-    fi
-
-    # ---------- 内容相同：跳过，不打扰 ----------
-    if cmp -s "$src" "$dst"; then
-        skip_count=$((skip_count + 1))
-        managed+=("$rel")
-        return 0
-    fi
-
-    # ---------- --upgrade：只有「没被改过」才覆盖 ----------
-    if [ "$upgrade" -eq 1 ]; then
-        rec=$(recorded "$rel")
-        if [ -n "$rec" ] && [ "$rec" = "$(sha "$dst")" ]; then
-            if [ "$dry" -eq 1 ]; then
-                log "  [预览] 更新 $rel"
-            else
-                write_file "$src" "$dst"
-            fi
-            upd_count=$((upd_count + 1))
-            managed+=("$rel")
-            return 0
-        fi
-
-        if [ "$dry" -eq 1 ]; then
-            log "  [预览] 冲突 $rel → $rel.new（本地有改动，不覆盖）"
-        else
-            write_file "$src" "$dst.new"
-            log "  本地已改动，新版写为 $rel.new（确认后可手动合并）"
-        fi
-        conflict_count=$((conflict_count + 1))
-        conflict_list="$conflict_list $rel"
-        # 没装进去，就不能把本地改动后的 hash 记进清单，否则下次 --upgrade
-        # 会误判成「没被改过」直接覆盖。保留上一次安装时的记录。
-        [ -n "$rec" ] && preserved+=("$rel $rec")
-        return 0
-    fi
-
-    # ---------- 默认：已存在就跳过 ----------
-    skip_count=$((skip_count + 1))
-    skip_list="$skip_list $rel"
-    managed+=("$rel")
-}
-
-log "模板来源: $REPO_ROOT"
 log "目标项目: $target"
+log "全局目录: $GLOBAL_HOME"
 log "规范版本: $VERSION"
 log ""
 
-# ---------- 核心：AGENTS.md + .agents/ ----------
-log "1. 核心规范"
-put "$agents_src" "$target/AGENTS.md"
-for f in "$REPO_ROOT"/.agents/*.md; do
-    [ -e "$f" ] || continue
-    is_wanted "$(basename "$f")" || continue
-    put "$f" "$target/.agents/$(basename "$f")"
-done
+# ---------- 1. 项目档案 ----------
+log "1. 项目档案"
+prof_dst="$target/.agents/project-profile.md"
+prof_src="$GLOBAL_HOME/.agents/project-profile.md"
 
-# 首次安装就按探测结果填好初稿，别让人对着「未定」逐项查
-if [ "$upgrade" -eq 0 ] && [ "$profile_existed" -eq 0 ]; then
-    seed_profile
-    if [ "$dry" -eq 0 ] && [ -f "$target/.agents/project-profile.md" ]; then
-        log "  已按探测结果填好 profile 初稿；type / visibility / verify_* 仍需确认"
+if [ ! -e "$prof_dst" ]; then
+    if [ "$dry" -eq 1 ]; then
+        log "  [预览] 新增 .agents/project-profile.md（并按探测结果填初稿）"
+    else
+        mkdir -p "$target/.agents"
+        if cp "$prof_src" "$prof_dst" 2>/dev/null; then
+            profile_created=1
+            new_count=$((new_count + 1))
+            seed_profile
+            log "  新增 .agents/project-profile.md，已按探测结果填好初稿"
+        else
+            log "  ! 写入失败：.agents/project-profile.md" >&2
+        fi
     fi
+else
+    skip_count=$((skip_count + 1))
+    log "  已存在 .agents/project-profile.md，未改动"
 fi
 
-if [ "$minimal" -eq 1 ]; then
-    # ---------- minimal：到此为止 ----------
-    log ""
-    log "2. 已跳过（--minimal）：CLAUDE.md、scripts/check.sh、钩子、CI"
-    log "   ! 没装 CLAUDE.md，Claude Code 将读不到这套规范。"
-    log "     需要的话去掉 --minimal 重跑，或手动建 CLAUDE.md 写一行 @AGENTS.md"
+# ---------- 2. 入口指针 ----------
+log "2. 入口指针"
+ptr_src="$GLOBAL_HOME/templates/project/AGENTS.md"
+ptr_dst="$target/AGENTS.md"
+
+if [ ! -e "$ptr_dst" ]; then
+    if [ "$dry" -eq 1 ]; then
+        log "  [预览] 新增 AGENTS.md（指向全局规范）"
+    elif mkdir -p "$target" && cp "$ptr_src" "$ptr_dst" 2>/dev/null; then
+        new_count=$((new_count + 1))
+        log "  新增 AGENTS.md（指向全局规范）"
+    else
+        log "  ! 写入失败：AGENTS.md" >&2
+    fi
+elif cmp -s "$ptr_src" "$ptr_dst"; then
+    skip_count=$((skip_count + 1))
+    log "  AGENTS.md 已是最新指针"
+elif grep -q '本文件是指针，不是规范本体' "$ptr_dst" 2>/dev/null; then
+    if [ "$dry" -eq 1 ]; then
+        log "  [预览] 更新 AGENTS.md（指针有新版本）"
+    else
+        cp "$ptr_src" "$ptr_dst"
+    fi
+    upd_count=$((upd_count + 1))
+    log "  更新 AGENTS.md（指针有新版本）"
+elif [ "$force" -eq 1 ]; then
+    if [ "$dry" -eq 1 ]; then
+        log "  [预览] 覆盖 AGENTS.md"
+    else
+        cp "$ptr_src" "$ptr_dst"
+    fi
+    upd_count=$((upd_count + 1))
+    log "  覆盖 AGENTS.md（--force）"
 else
-    # ---------- 工具入口：CLAUDE.md ----------
-    log "2. 工具入口"
-    put "$REPO_ROOT/CLAUDE.md" "$target/CLAUDE.md"
+    agents_custom=1
+    skip_count=$((skip_count + 1))
+    log "  ! 已有自定义 AGENTS.md，未覆盖"
+fi
 
-    # ---------- 自检脚本（按需） ----------
-    if [ "$with_check" -eq 1 ]; then
-        if [ "$with_ci" -eq 1 ]; then
-            log "3. 自检脚本（CI 依赖它，自动带上）"
-        else
-            log "3. 自检脚本"
-        fi
-        put "$REPO_ROOT/scripts/check.sh" "$target/scripts/check.sh"
-        if [ "$dry" -eq 0 ] && [ -f "$target/scripts/check.sh" ]; then
-            chmod +x "$target/scripts/check.sh"
-        fi
+cl_src="$GLOBAL_HOME/templates/project/CLAUDE.md"
+cl_dst="$target/CLAUDE.md"
+
+if [ ! -e "$cl_dst" ]; then
+    if [ "$dry" -eq 1 ]; then
+        log "  [预览] 新增 CLAUDE.md（一行 @AGENTS.md）"
+    elif cp "$cl_src" "$cl_dst" 2>/dev/null; then
+        new_count=$((new_count + 1))
+        log "  新增 CLAUDE.md（一行 @AGENTS.md）"
+    else
+        log "  ! 写入失败：CLAUDE.md" >&2
+    fi
+elif grep -q '^@AGENTS\.md' "$cl_dst" 2>/dev/null; then
+    skip_count=$((skip_count + 1))
+    log "  CLAUDE.md 已含 @AGENTS.md"
+elif [ "$force" -eq 1 ]; then
+    if [ "$dry" -eq 1 ]; then
+        log "  [预览] 覆盖 CLAUDE.md"
+    else
+        cp "$cl_src" "$cl_dst"
+    fi
+    upd_count=$((upd_count + 1))
+    log "  覆盖 CLAUDE.md（--force）"
+else
+    claude_custom=1
+    skip_count=$((skip_count + 1))
+    log "  ! 已有自定义 CLAUDE.md，未覆盖"
+fi
+
+if [ "$agents_custom" -eq 1 ]; then
+    log ""
+    log "  手动处理：在 AGENTS.md 开头加一段，指明规范在全局目录——"
+    log "    本仓库的 AI 开发规范在 \${AI_DEV_STANDARDS_HOME:-\$HOME/.ai-dev-standards}/"
+    log "    开工前先读该目录下的 AGENTS.md，模块路径相对它所在目录。"
+    log "    再读本仓库 .agents/project-profile.md。"
+fi
+if [ "$claude_custom" -eq 1 ]; then
+    log ""
+    log "  手动处理：在 CLAUDE.md 第一行加 @AGENTS.md"
+fi
+
+# ---------- 3. git 钩子 ----------
+hook_new=0
+hook_skip=0
+
+install_hooks() {
+    local git_dir hook_dir src dst h configured
+    git_dir=""
+    if git -C "$target" rev-parse --absolute-git-dir >/dev/null 2>&1; then
+        git_dir=$(git -C "$target" rev-parse --absolute-git-dir)
     fi
 
-    if [ "$with_ci" -eq 1 ]; then
-        log "4. GitHub Actions 门禁"
-        put "$REPO_ROOT/templates/github/check.yml" "$target/.github/workflows/check.yml"
+    if [ -z "$git_dir" ]; then
+        log "  ! 目标不是 git 仓库，跳过钩子安装（装钩子需要仓库）"
+        return 0
     fi
 
-    if [ "$with_hooks" -eq 1 ]; then
-        log "5. git 钩子"
+    hook_dir="$git_dir/hooks"
+    configured=$(git -C "$target" config core.hooksPath 2>/dev/null)
+    if [ -n "$configured" ]; then
+        log "  ! 该项目已配置 core.hooksPath=$configured"
+        log "    git 会忽略 .git/hooks/，刚装的钩子不会生效。"
+        log "    处理：git config --unset core.hooksPath"
+    fi
 
-        git_dir=""
-        if git -C "$target" rev-parse --absolute-git-dir >/dev/null 2>&1; then
-            git_dir=$(git -C "$target" rev-parse --absolute-git-dir)
+    for h in commit-msg post-commit; do
+        src="$GLOBAL_HOME/templates/githooks/$h"
+        dst="$hook_dir/$h"
+        [ -f "$src" ] || continue
+
+        if [ "$dry" -eq 1 ]; then
+            if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
+                hook_skip=$((hook_skip + 1))
+            else
+                log "  [预览] .git/hooks/$h"
+                hook_new=$((hook_new + 1))
+            fi
+            continue
         fi
 
-        if [ -z "$git_dir" ]; then
-            log "  ! 目标不是 git 仓库，跳过钩子安装（装钩子需要仓库）"
-        elif [ "$hooks_mode" = "shared" ]; then
-            # .githooks/ 跟着仓库走：团队 clone 后不用各自装
-            hook_dir="$target/.githooks"
-            for h in commit-msg post-commit; do
-                src="$REPO_ROOT/templates/githooks/$h"
-                [ -f "$src" ] || continue
-                put "$src" "$hook_dir/$h"
-                [ "$dry" -eq 0 ] && [ -f "$hook_dir/$h" ] && chmod +x "$hook_dir/$h"
-            done
-            if [ "$dry" -eq 0 ]; then
-                git -C "$target" config core.hooksPath .githooks
-                log "  已设 core.hooksPath=.githooks，钩子会跟仓库一起提交"
-            fi
-        else
-            hook_dir="$git_dir/hooks"
+        mkdir -p "$hook_dir"
 
-            # core.hooksPath 一旦设置，git 就完全不看 .git/hooks/ 了
-            configured_hooks_path=$(git -C "$target" config core.hooksPath 2>/dev/null)
-            if [ -n "$configured_hooks_path" ]; then
-                log "  ! 该项目已配置 core.hooksPath=$configured_hooks_path"
-                log "    git 会忽略 .git/hooks/，刚装的钩子不会生效。"
-                log "    两种处理：git config --unset core.hooksPath（改回 .git/hooks/）"
-                log "              或用 --shared-hooks 把钩子装进项目里的 .githooks/"
-            fi
-
-            for h in commit-msg post-commit; do
-                src="$REPO_ROOT/templates/githooks/$h"
-                dst="$hook_dir/$h"
-                [ -f "$src" ] || continue
-
-                if [ "$dry" -eq 1 ]; then
-                    if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
-                        skip_count=$((skip_count + 1))
-                    else
-                        log "  [预览] .git/hooks/$h"
-                        new_count=$((new_count + 1))
-                    fi
+        if [ -f "$dst" ]; then
+            if grep -q 'ai-dev-standards-hook' "$dst" 2>/dev/null; then
+                if cmp -s "$src" "$dst"; then
+                    hook_skip=$((hook_skip + 1))
                     continue
                 fi
-
-                mkdir -p "$hook_dir"
-
-                # 已有钩子分三种情况处理，不静默停用用户的东西
-                if [ -f "$dst" ]; then
-                    if grep -q 'ai-dev-standards-hook' "$dst" 2>/dev/null; then
-                        # 已经是我们的：内容一样就不重写，这样重复安装才是真幂等
-                        if cmp -s "$src" "$dst"; then
-                            skip_count=$((skip_count + 1))
-                            continue
-                        fi
-                        log "  更新 $h（$VERSION）"
-                        upd_count=$((upd_count + 1))
-                    elif [ -f "$dst.local" ]; then
-                        log "  已有 $h，原钩子保留在 $(basename "$dst").local，未重复备份"
-                    else
-                        # 用户自定义钩子：改名成 .local，由我们的钩子链式调用
-                        if cp "$dst" "$dst.local" 2>/dev/null; then
-                            log "  已有自定义 $h，保留为 $(basename "$dst").local（规范钩子会接着执行它）"
-                        else
-                            log "  ! 已有 $h，无法保留原钩子，仍继续覆盖"
-                        fi
-                    fi
+                log "  更新 $h（$VERSION）"
+            elif [ -f "$dst.local" ]; then
+                log "  已有 $h，原钩子保留在 $(basename "$dst").local，未重复备份"
+            else
+                if cp "$dst" "$dst.local" 2>/dev/null; then
+                    log "  已有自定义 $h，保留为 $(basename "$dst").local（规范钩子会接着执行它）"
+                else
+                    log "  ! 已有 $h，无法保留原钩子，仍继续覆盖"
                 fi
-
-                cp "$src" "$dst" && chmod +x "$dst" && new_count=$((new_count + 1))
-            done
+            fi
         fi
-    else
-        log "4. 已跳过钩子（--no-hooks）"
-    fi
-fi
 
-# ---------- 安装清单：给 --upgrade 判断「谁改过」用 ----------
-# 不参与「写入 N 个文件」的计数：它是安装器自己的元数据，不是装进项目的内容。
-write_manifest() {
-    [ "$dry" -eq 1 ] && return 0
-    [ "${#managed[@]}" -eq 0 ] && return 0
-
-    local tmp
-    tmp="$(mktemp 2>/dev/null)" || return 0
-
-    mkdir -p "$target/.agents"
-    {
-        printf '%s\n' "# ai-dev-standards 安装清单，install.sh 生成，不要手改。"
-        printf '%s\n' "# 用途：--upgrade 用这里的 sha256 判断文件是否被本地改过。"
-        printf 'version=%s\n' "$VERSION"
-        printf 'installed=%s\n' "$(date +%Y-%m-%d)"
-        for rel in "${managed[@]}"; do
-            [ -f "$target/$rel" ] || continue
-            printf 'file %s %s\n' "$rel" "$(sha "$target/$rel")"
-        done
-        if [ "${#preserved[@]}" -gt 0 ]; then
-            for entry in "${preserved[@]}"; do
-                printf 'file %s\n' "$entry"
-            done
-        fi
-    } > "$tmp"
-
-    # 内容没变就不落盘，避免每天多出一条无意义的改动
-    if ! cmp -s "$tmp" "$manifest"; then
-        cat "$tmp" > "$manifest"
-    fi
-    rm -f "$tmp"
+        cp "$src" "$dst" && chmod +x "$dst" && hook_new=$((hook_new + 1))
+    done
 }
 
-write_manifest
+log ""
+log "3. git 钩子"
+if [ "$no_hooks" -eq 1 ]; then
+    log "  已跳过（--no-hooks）"
+else
+    install_hooks
+fi
 
 # ---------- 汇总 ----------
 log ""
 log "────────────────────────────"
-log "写入 $new_count 个文件，更新 $upd_count 个，跳过 $skip_count 个已存在的文件"
-total_modules=$(ls -1 "$REPO_ROOT"/.agents/*.md 2>/dev/null | wc -l | tr -d ' ')
-log "模块：$(printf '%s\n' $wanted | wc -l | tr -d ' ')/${total_modules}$([ -n "$skipped_modules" ] && printf '（与项目无关，跳过%s）' "$skipped_modules")"
-[ "$profile_kept" -eq 1 ] && log "项目档案未改动：升级不改 .agents/project-profile.md（要重整跑 /ai-dev-standards:profile）"
-[ "$dry" -eq 0 ] && [ -f "$manifest" ] && log "安装清单: .agents/.standards-version（version=$VERSION）"
-
-if [ "$conflict_count" -gt 0 ]; then
-    log ""
-    log "有 $conflict_count 个文件本地改动过，新版另存为 .new："
-    for f in $conflict_list; do log "  $f"; done
-    log "手动 diff 合并后删掉 .new 即可。"
+log "写入 $new_count 个文件，更新 $upd_count 个，跳过 $skip_count 个"
+if [ "$no_hooks" -eq 0 ]; then
+    log "钩子：新增/更新 $hook_new 个，跳过 $hook_skip 个"
 fi
-
-if [ -n "$skip_list" ]; then
-    log ""
-    log "以下文件已存在、内容与模板不同，未被覆盖："
-    for f in $skip_list; do log "  $f"; done
-    log ""
-    log "只是版本旧了用 --upgrade；确认要以模板为准请加 --force 重跑。"
-fi
-
-if [ "$dry" -eq 0 ] && [ "$profile_kept" -eq 0 ]; then
-    log ""
-    log "下一步（必须）：生成 .agents/project-profile.md"
-    log "  文件里全是「未定」。别手填——装过插件的话跑：/ai-dev-standards:profile"
-    log "  它会探测项目事实，只问你几个必须由人决定的选择。"
-    log "  规范要求 AI 遇到未定项必须停下来问，不许拿示例值当事实。"
-    log "  字段说明见 references/profile-guide.md"
-    if [ -f "$target/scripts/check.sh" ] && [ "$dry" -eq 0 ]; then
-        log ""
-        log "验证安装：cd \"$target\" && bash scripts/check.sh"
-    fi
-fi
-
-# 裁剪 AGENTS.md 用的临时目录
-if [ -n "${tmpdir:-}" ]; then
-    rm -f "$tmpdir/AGENTS.md" "$tmpdir/next" 2>/dev/null
-    rmdir "$tmpdir" 2>/dev/null || true
-fi
+log ""
+log "下一步：补齐 .agents/project-profile.md 里剩下的「未定」"
+log "  装过插件：/ai-dev-standards:profile"
+log "  没装插件：让 AI 按 references/profile-guide.md 的「一键生成」执行"
+log ""
+log "其他项目只需重复这一步；规范本身升级只跑 install.sh --global --upgrade"

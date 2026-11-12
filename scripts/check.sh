@@ -38,7 +38,7 @@ section() {
 
 # 所有需要检查的文档。docs/ 必须在这里：它占了两个最长的文档，
 # 之前漏掉过，结果是往里面塞真实邮箱都能全绿。
-docs=$(ls AGENTS.md README.md CLAUDE.md SKILL.md docs/*.md .agents/*.md reviews/*.md references/*.md skills/*/SKILL.md commands/*.md 2>/dev/null)
+docs=$(ls AGENTS.md README.md CLAUDE.md SKILL.md docs/*.md .agents/*.md reviews/*.md references/*.md skills/*/SKILL.md commands/*.md templates/project/*.md 2>/dev/null)
 
 # ---------------------------------------------------------------- 1. 入口行数
 section "1. 入口文件长度"
@@ -149,18 +149,21 @@ else
 fi
 
 # ---------------------------------------------------------------- 6. 数字对账
-# 「11 个模块」这类数字散在多个文件里，改一个数最容易漏改其余几处。
+# 「14 个模块」「全局 22 个文件」这类数字散在多个文件里，改一个数最容易漏改其余几处。
 # 这里用仓库实际值去核对，不靠人肉记。
 section "6. 文档里的数字与实际一致"
 # CHANGELOG 记的是历史事实，不参与对账
 count_docs=$(printf '%s\n' $docs | grep -v '^CHANGELOG.md$')
-expected_files=$((module_count + 4))   # AGENTS.md + CLAUDE.md + 2 个钩子
+# 全局目录装的是：AGENTS.md + 模块 + scripts/×2 + templates/githooks/×2
+#                  + templates/project/×2 + templates/github/×1
+# 加模板或脚本时改这个偏移，文档里的「全局 N 个文件」会跟着对上。
+global_files=$((module_count + 8))
 
 num_bad=""
 mod_hits=$(grep -ohE '[0-9]+ 个模块' $count_docs 2>/dev/null | sort -u)
-file_hits=$(grep -ohE '写入 [0-9]+ 个文件' $count_docs 2>/dev/null | sort -u)
+global_hits=$(grep -ohE '全局[^。，；：]{0,10}[0-9]+ 个文件' $count_docs 2>/dev/null | sort -u)
 
-# 这两类命中都带空格，按行切而不是按词切，否则 "11 个模块" 会被拆成 "11" 和 "个模块"
+# 这两类命中都带空格，按行切而不是按词切，否则 "14 个模块" 会被拆成 "14" 和 "个模块"
 old_ifs=$IFS
 IFS='
 '
@@ -168,18 +171,19 @@ for hit in $mod_hits; do
     n=${hit%% 个模块*}
     [ "$n" = "$module_count" ] || num_bad="$num_bad ${hit}(应为 ${module_count})"
 done
-for hit in $file_hits; do
-    n=$(printf '%s' "$hit" | sed -E 's/写入 ([0-9]+) 个文件/\1/')
-    # 0 是「重复安装，全部跳过」的场景，不是全新安装的计数，不参与对账
-    [ "$n" = "0" ] && continue
-    [ "$n" = "$expected_files" ] || num_bad="$num_bad ${hit}(应为 ${expected_files})"
+for hit in $global_hits; do
+    n=$(printf '%s' "$hit" | sed -E 's/.*[^0-9]([0-9]+) 个文件/\1/')
+    [ "$n" = "$global_files" ] || num_bad="$num_bad ${hit}(应为 ${global_files})"
 done
 IFS=$old_ifs
 
+# 文档必须声明这个数，否则「全局装了多少」没人说得清
+[ -z "$global_hits" ] && num_bad="$num_bad 文档里没写「全局 N 个文件」（当前应为 ${global_files}）"
+
 if [ -z "$num_bad" ]; then
-    ok "模块数 ${module_count}、默认安装 ${expected_files} 个文件，文档与仓库一致"
+    ok "模块数 ${module_count}、全局安装 ${global_files} 个文件，文档与仓库一致"
 else
-    bad "文档里的数字过期：$num_bad"
+    bad "文档里的数字过期或缺失：$num_bad"
 fi
 
 # ---------------------------------------------------------------- 7. 插件清单

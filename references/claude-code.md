@@ -43,15 +43,15 @@ claude plugin install ai-dev-standards --marketplace 999bug/ai-dev-standards
 /ai-dev-standards:install
 ```
 
-命令会在当前项目里跑安装器：先 `--dry-run` 给你看要写哪些文件，确认后再落盘。默认级别＝规范文件 + `CLAUDE.md` + `.git/hooks/` 下的两个钩子。
+命令分两步：先确认全局目录（`~/.ai-dev-standards/`）装了没有、是不是最新，再初始化当前项目——写 `AGENTS.md` 指针、`CLAUDE.md`、`.agents/project-profile.md`，钩子进 `.git/hooks/`。两步都先 `--dry-run` 给你看要写什么。
 
-更新项目里的规范：
+更新规范：
 
 ```text
 /ai-dev-standards:upgrade
 ```
 
-它按 `.agents/.standards-version` 里记录的 sha256 判断每个文件是否被改过：没改过的更新，改过的另存为 `<文件>.new`。**不要用 `--force` 代替升级**，那会连本地改动一起覆盖。
+只升全局目录。项目侧没有模块副本，不需要升级。你改过的全局模块会先备份到 `.backup/<时间戳>/` 再覆盖，**不要用 `--force` 代替**。
 
 ### 发布侧：改版本 → 打 tag
 
@@ -71,15 +71,18 @@ bash scripts/release.sh 1.6.0
 
 ## 方式二：克隆后自己跑安装器
 
-不想装插件的话，直接克隆仓库跑脚本，效果一样——装进项目的是同一批文件。
+不想装插件的话，直接克隆仓库跑脚本，效果一样。
 
 ```bash
-# 1. 装到项目
 git clone https://github.com/999bug/ai-dev-standards.git
-cd ai-dev-standards
-./install.sh /path/to/your-project
 
-# 2. 在项目里启动 Claude Code
+# 1. 全局装一次（所有项目共用）
+./ai-dev-standards/install.sh --global
+
+# 2. 项目初始化一次
+./ai-dev-standards/install.sh /path/to/your-project
+
+# 3. 在项目里启动 Claude Code
 cd /path/to/your-project
 claude
 ```
@@ -100,12 +103,21 @@ Windows 上是 `C:\Users\<用户名>\.claude\skills\ai-dev-standards`。这种�
 
 ## 插件自带的 SessionStart 提醒（只读）
 
-装完插件后，每次在 git 仓库里开新会话，会看到两三行：
+装完插件后，每次在 git 仓库里开新会话，会看到两三行，按接入状态分三种：
 
 ```text
-[ai-dev-standards] 本仓库已装这套规范（37 处「未定」待确认）。
-  动手前先确认 project-profile.md，不许拿示例值当项目事实。
-  改代码前按 AGENTS.md 第 3 节分流表加载模块，不要一次性全读。
+# 本项目已接入
+[ai-dev-standards] 本仓库已接入（规范在 ~/.ai-dev-standards，3 处「未定」待确认）。
+  一键填充：/ai-dev-standards:profile（探测项目事实，只问几个必须人决定的选择）
+  改代码前先读 ~/.ai-dev-standards/AGENTS.md，再按第 3 节分流表加载模块，不要一次性全读。
+
+# 全局装了，但本项目还没初始化
+[ai-dev-standards] 全局规范已装（~/.ai-dev-standards），但本仓库还没初始化。
+  初始化：/ai-dev-standards:install（只写 3 个文件 + 2 个钩子）
+
+# 全局也没装
+[ai-dev-standards] 还没装这套规范。
+  安装：/ai-dev-standards:install（全局装一次，之后每个项目初始化一次）
 ```
 
 ### 原理
@@ -134,9 +146,9 @@ Windows 上是 `C:\Users\<用户名>\.claude\skills\ai-dev-standards`。这种�
 `session-context.sh` 只读不写，按顺序判断：
 
 1. 当前是不是 git 仓库 —— 不是就退出（临时目录、家目录不该被塞提示）
-2. 有 `.agents/project-profile.md` —— 报还剩几处「未定」，提醒按分流表加载模块
-3. 有 `AGENTS.md` 但没有 `.agents/` —— 提示"未介入"，给出安装命令
-4. 什么都没有 —— 提示安装命令
+2. 有 `.agents/project-profile.md` —— 已接入，报还剩几处「未定」，给出全局规范路径
+3. 没有 profile，但全局目录存在 —— 提示这个仓库还没初始化，给出 install 命令
+4. 全局目录也没有 —— 提示先装全局
 
 stdout 会进入 Claude 的上下文，所以这条提醒是真的会被读到的，不需要你每次手动说开场白。
 
@@ -162,7 +174,7 @@ claude plugin list
 
 **② 装完插件不会立刻生效。** `plugin install` 只把文件复制到 `~/.claude/plugins/cache/`，不执行任何脚本——Claude Code 没有 post-install 钩子。必须退出会话再重进，命令和 hook 才会加载。
 
-**③ 项目已有 `CLAUDE.md` 时要手动接一下。** 安装器不覆盖已有文件，会跳过它。但那样 `AGENTS.md` 装了也读不到，得在 `CLAUDE.md` 第一行加 `@AGENTS.md`。
+**③ 项目已有 `CLAUDE.md` 或 `AGENTS.md` 时要手动接一下。** 安装器不覆盖已有文件，会跳过并提示。但那样规范读不到：`CLAUDE.md` 要在第一行加 `@AGENTS.md`；`AGENTS.md` 要在开头加一段指向全局目录的说明（安装器会把该写什么打出来）。
 
 ### 开关
 
@@ -196,9 +208,11 @@ AI_DEV_STANDARDS_SKIP=1 claude
 
 导入解析会跳过行内代码和围栏代码块。所以文档里写 `@README`（带反引号）是字面量，写 @README（不带）才会真导入。别在 `CLAUDE.md` 里随手写带 `@` 的路径。
 
-**4. 指向项目外的导入会弹审批框**
+**4. 读项目外的文件会弹审批框**
 
-`CLAUDE.md` 里 `@` 的路径如果解析到工作目录之外（例如 `@~/.claude/my-rules.md`），Claude Code 第一次会弹窗要求批准，拒绝后不再出现。本套的 `@AGENTS.md` 在项目内，不会触发。
+`CLAUDE.md` 里 `@` 的路径如果解析到工作目录之外（例如 `@~/.claude/my-rules.md`），Claude Code 第一次会弹窗要求批准，拒绝后不再出现。
+
+新结构下项目 `CLAUDE.md` 只导入项目内的 `AGENTS.md`，不触发这个框。但指针会让模型用 Read 工具去读 `~/.ai-dev-standards/AGENTS.md`——这属于读工作区外文件，**第一次也会弹一次审批**。批准一次即可，同一路径之后不再问。如果用户拒绝了，模型读不到规范，只剩指针里那几行约束。
 
 **5. `CLAUDE.local.md` 是另一回事**
 
@@ -206,15 +220,11 @@ AI_DEV_STANDARDS_SKIP=1 claude
 
 ## 两个可选增强
 
-**如果 Claude 不主动读 `.agents/` 模块**，把 `CLAUDE.md` 改成：
+**如果 Claude 不主动读全局模块**，在项目 `AGENTS.md` 末尾加一句：
 
-```markdown
-@AGENTS.md
+> 按全局 AGENTS.md 第 3 节分流表按需读取模块，不要一次性全读；模块与全局 AGENTS.md 同目录。
 
-> `.agents/` 下的模块按 AGENTS.md 第 3 节分流表按需读取，不要一次性全读。
-```
-
-原因：`AGENTS.md` 里的分流表是表格，模型未必会把它当成"现在就去读文件"的指令。加一句显式要求更稳。
+原因：分流表是表格，模型未必会把它当成"现在就去读文件"的指令。加一句显式要求更稳。
 
 **定期跑指令审计**（Claude Code v2.1.283+）：
 
@@ -230,7 +240,7 @@ AI_DEV_STANDARDS_SKIP=1 claude
 | --- | --- | --- |
 | 入口文件 | `CLAUDE.md` | `AGENTS.md`（并通过 `CLAUDE.md` 兼容） |
 | 是否自动读模块 | 否，靠分流表 + 模型主动 Read | 同 |
-| 承诺完成后的门禁 | git hooks + CI | 同 |
+| 承诺完成后的门禁 | 项目内 git hooks + 规范仓库自检 | 同 |
 | 额外机制 | 插件命令安装 + SessionStart 上下文提醒 | skill 可按需触发安装器 |
 
-两边共用同一份 `AGENTS.md` 和 `.agents/`，不需要维护两套。改规则只改仓库，两个工具同时生效。
+两边读同一份全局 `AGENTS.md` 和 `.agents/`，不需要维护两套。改规则只改全局目录，两个工具同时生效。

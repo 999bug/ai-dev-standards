@@ -1,8 +1,8 @@
 # 在其他 agent 里使用
 
-这套规范的文件是通用的，**同一个项目只需要装一次**。各工具的差别只在入口文件：有的直接读 `AGENTS.md`，有的要一个桥接文件。
+这套规范**全局装一次，每个项目只初始化一次**。各工具的差别只在入口文件：有的直接读 `AGENTS.md`，有的要一个桥接文件。
 
-先按 [手动安装](manual-install.md) 把规范装进项目，再回来看对应工具那一节。
+先按 [手动安装](manual-install.md) 装好全局目录、初始化项目，再回来看对应工具那一节。
 
 ## 总览
 
@@ -49,10 +49,11 @@ git clone https://github.com/999bug/ai-dev-standards.git <项目>/.workbuddy/ski
 ```bash
 git clone https://github.com/999bug/ai-dev-standards.git
 cd ai-dev-standards
-./install.sh /path/to/your-project --with-ci
+./install.sh --global                      # 全局一次
+./install.sh /path/to/your-project         # 每个项目一次
 ```
 
-WorkBuddy 会把项目根的 `AGENTS.md` 作为项目规范读进上下文，不需要额外入口文件。
+WorkBuddy 会把项目根的 `AGENTS.md` 作为项目规范读进上下文，不需要额外入口文件；指针会把它引到全局目录。
 
 ### 验证
 
@@ -60,7 +61,7 @@ WorkBuddy 会把项目根的 `AGENTS.md` 作为项目规范读进上下文，不
 
 > 改这个项目的 Java 代码前，你会先读哪个文件？
 
-应该回答 `.agents/lang-java.md`。答不出来说明 `AGENTS.md` 没被读到。
+应该回答全局目录下的 `lang-java.md`。答不出来说明项目 `AGENTS.md` 指针没被读到，或全局目录不可读。
 
 ## Codex
 
@@ -78,7 +79,7 @@ Codex 原生读 `AGENTS.md`，装完直接能用。
 - 本套入口只有 150 行，离 32 KiB 上限很远，不需要调参数。
 - 子目录需要额外规则时，在子目录放一个 `AGENTS.md` 补差异，不要重复根文件内容。
 
-验证：`codex` 里问「按你读到的规范，改 Java 前先读哪个文件」，应回答 `.agents/lang-java.md`。
+验证：`codex` 里问「按你读到的规范，改 Java 前先读哪个文件」，应回答全局目录下的 `lang-java.md`。
 
 ## opencode
 
@@ -91,7 +92,7 @@ opencode 原生读 `AGENTS.md`，没有时回退到 `CLAUDE.md`，所以装完�
 两个注意点：
 
 1. **不要跑 `/init`**。它会扫描仓库并改写 `AGENTS.md`，容易把手工维护的入口冲掉。
-2. 默认不需要 `instructions` 配置。`.agents/` 的模块本来就该按分流表按需读，一次性全塞进上下文会挤掉真正重要的内容。
+2. 默认不需要 `instructions` 配置。全局目录的模块本来就该按分流表按需读，一次性全塞进上下文会挤掉真正重要的内容。
 
 验证：`opencode` 里问「这个项目的提交信息类型有哪些」，应回答 `NF/BF/IM/SC/CU/RF/Doc/OT/Tag`。
 
@@ -102,7 +103,7 @@ Cursor 支持项目根和子目录的 `AGENTS.md`，不需要转成 `.cursor/rul
 - 一套项目规则只维护一个地方。用了 `AGENTS.md` 就别再往 `.cursor/rules/` 里抄一份，两边会漂移。
 - `.cursor/rules/*.mdc` 适合需要 `globs` 按文件路径生效的规则；本项目靠 `AGENTS.md` 第 3 节的分流表决定读哪个模块，不需要 globs。
 
-验证：在 Cursor 里问「改这个项目的 Vue 代码要读哪个模块」，应回答 `.agents/lang-vue.md`。
+验证：在 Cursor 里问「改这个项目的 Vue 代码要读哪个模块」，应回答全局目录下的 `lang-vue.md`。
 
 ## GitHub Copilot
 
@@ -133,7 +134,7 @@ Gemini CLI 支持 `@file.md` 导入，`AGENTS.md` 会被展开进上下文。原
 
 字段名和可用性随版本变化，以你装的版本文档为准。两种方式选一种，不要同时用。
 
-验证：`gemini` 里问「改 Java 前先读哪个文件」，应回答 `.agents/lang-java.md`。
+验证：`gemini` 里问「改 Java 前先读哪个文件」，应回答全局目录下的 `lang-java.md`。
 
 ## 通用注意点
 
@@ -144,15 +145,15 @@ git mv AGENTS.md agent.md
 ln -s agent.md AGENTS.md
 ```
 
-**不要在多个工具里各存一份规则**。改规则只改项目里的 `AGENTS.md` 和 `.agents/`，所有工具一起生效；也不要把 `.agents/` 的内容复制到别的入口文件里。
+**不要在多个工具里各存一份规则**。改规则只改全局目录，所有工具一起生效；也不要把模块内容复制到别的入口文件里。
 
-**换工具不用重装**。已经装过的项目，新工具只要能读到入口文件就能用，`install.sh` 再跑也只会跳过。
+**换工具不用重装**。已经初始化过的项目，新工具只要能读到入口文件就能用，`install.sh` 再跑也只会跳过。
 
 ## 验证清单
 
 不管用哪个工具，新开会话问这三个问题，都能答对才算接上了：
 
-1. 改 Java 代码前要先读哪个文件？→ `.agents/lang-java.md`
+1. 改 Java 代码前要先读哪个文件？→ 全局目录下的 `lang-java.md`
 2. 提交信息的类型有哪些？→ `NF/BF/IM/SC/CU/RF/Doc/OT/Tag`
 3. 这个项目的构建命令是什么？→ `.agents/project-profile.md` 里填的那个
 

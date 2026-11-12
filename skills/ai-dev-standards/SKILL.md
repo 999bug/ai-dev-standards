@@ -1,6 +1,6 @@
 ---
 name: ai-dev-standards
-description: Installs a layered AI development standards kit into a project repository — AGENTS.md entry file, .agents/ task modules, commit-msg hook, and CI self-check gate. Use when the user asks to set up AI coding conventions for a project, initialize or adopt AGENTS.md, apply the same standards across multiple repositories, or asks why a project has no AGENTS.md / .agents setup.
+description: Installs a layered AI development standards kit once into a global directory and initializes each project with a pointer AGENTS.md, a one-line CLAUDE.md, and .agents/project-profile.md. Use when the user asks to set up AI coding conventions, adopt AGENTS.md across multiple projects, avoid reinstalling standards per repository, or asks why a project has no AGENTS.md / .agents setup.
 ---
 
 # AI 开发规范（安装器）
@@ -15,21 +15,38 @@ Read <插件根>/SKILL.md
 
 ## 最短路径
 
-1. 确认目标项目根目录（通常是有 `.git/` 的那一层），先看有没有装过：
+1. 先确认全局目录装没装：
+
+   ```bash
+   ls "${AI_DEV_STANDARDS_HOME:-$HOME/.ai-dev-standards}/AGENTS.md" 2>/dev/null
+   ```
+
+   没有 → 先装全局，加 `--dry-run` 给用户看再落盘：
+
+   ```bash
+   bash <插件根>/install.sh --global --dry-run
+   bash <插件根>/install.sh --global
+   ```
+
+   有 → 跳过这步。项目侧不需要重复装规范。
+
+2. 确认目标项目根目录（通常是有 `.git/` 的那一层），看初始化过没有：
 
    ```bash
    ls <目标>/.agents/project-profile.md 2>/dev/null
    ```
 
-   已经有 → 说明装过了，改用 `/ai-dev-standards:upgrade`，不要重装。
+   有 → 说明初始化过了，只补 profile，不要再装。
 
-2. 预览，把会写哪些文件贴给用户，**等确认**：
+3. 预览，把会写哪些文件贴给用户，**等确认**：
 
    ```bash
    bash <插件根>/install.sh <目标> --dry-run
    ```
 
-3. 安装（默认级别：规范文件 + `CLAUDE.md` + git 钩子）：
+   正常只有 3 个文件 + 2 个钩子。出现 `.agents/commit.md` 之类的模块说明是旧结构——停下，按打印的清单让用户自己清理。
+
+4. 初始化：
 
    ```bash
    bash <插件根>/install.sh <目标>
@@ -37,10 +54,11 @@ Read <插件根>/SKILL.md
 
    Windows 无 `bash` 时用 `pwsh -NoProfile -File <插件根>/install.ps1 -Target <目标>`。
 
-4. 填 `.agents/project-profile.md`：从项目里读事实，能推断的直接填，推断不了的一次性列出来问用户。字段说明见 `<插件根>/references/profile-guide.md`。
+5. 填 `.agents/project-profile.md`：从项目里读事实，能推断的直接填，推断不了的一次性列出来问用户。字段说明见 `<插件根>/references/profile-guide.md`。
 
 ## 边界
 
-- 不覆盖已有文件；升级只走 `--upgrade`，不加 `--force`。
-- 不替用户决定装 CI / 自检脚本，除非他明确要。
+- 不覆盖已有文件；全局升级只走 `--global --upgrade`，不加 `--force`。
+- 项目侧不需要升级，别去项目里跑 upgrade。
+- 旧结构只报告、不删文件，清理命令交给用户执行。
 - 装完不复述整个规范，只报「装了哪些 + 下一步填 profile」。

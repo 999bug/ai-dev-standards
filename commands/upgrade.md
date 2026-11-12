@@ -1,56 +1,67 @@
 ---
-description: 把项目里已装的 AI 开发规范升级到插件当前版本，保留本地改动
-argument-hint: "[目标项目目录，默认当前目录]"
+description: 升级全局 AI 开发规范（项目侧不需要升级）
 ---
 
 # 升级 AI 开发规范
 
-目标项目：`$ARGUMENTS`
-没给参数就用当前工作目录。
+项目里只有指针和 `project-profile.md`，内容固定，**不需要升级**。要升的只有全局目录。
 
 > 路径解析：`${CLAUDE_PLUGIN_ROOT}` 由插件注入。万一它为空，先跑
-> `ls ~/.claude/plugins/cache/ai-dev-standards/` 找到版本目录，用那个绝对路径代替。
+> `ls ~/.claude/plugins/cache/ai-dev-standards/` 找到版本目录，用那个绝对路径代替，
+> 不要凭猜写路径。
 
-## 1. 先看现状
+## 1. 看现状
 
 ```bash
-grep '^version=' "<目标>/.agents/.standards-version"
+GH="${AI_DEV_STANDARDS_HOME:-$HOME/.ai-dev-standards}"
+grep -E '^(version|source)=' "$GH/.standards-version" 2>/dev/null
 ```
 
-- 文件不存在：说明是旧版安装器装的（或没装）。告诉用户这一版起才有升级清单，
-  让他先跑 `/ai-dev-standards:install` 补齐清单，或直接用 `--force` 覆盖。
-- 当前版本与插件版本一致：告诉用户已经是最新，不必升级。
+| 结果 | 含义 |
+| --- | --- |
+| 清单不存在 | 全局还没装过。改用 `/ai-dev-standards:install` |
+| `version` 与插件版本一致 | 已经最新，不用升 |
+| `source=git` | 全局目录是 clone 的仓库，可以 `git -C "$GH" pull --ff-only` 后再跑一次安装刷新清单 |
+| `source=repo` | 全局目录就是插件仓库本身，升级跟随插件更新，跑安装刷新清单即可 |
 
 ## 2. 预览
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/install.sh" "<目标>" --upgrade --dry-run
+bash "${CLAUDE_PLUGIN_ROOT}/install.sh" --global --upgrade --dry-run
 ```
 
-Windows 无 `bash` 时用 `pwsh -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/install.ps1" -Target "<目标>" -Upgrade -DryRun`。
+Windows 没有 `bash` 时用：
 
-预览里的三类结果要分别解释给用户：
+```
+pwsh -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/install.ps1" -Global -Upgrade -DryRun
+```
+
+三类结果分别解释给用户：
 
 | 输出 | 含义 |
 | --- | --- |
-| 更新 | 安装后没被改过，会覆盖成新版 |
-| 跳过 | 内容已经和新版一致 |
-| 冲突 → `.new` | 本地改过，新版另存为 `<文件>.new`，不动原文件 |
+| 更新 | 装完之后没被改过，会直接覆盖成新版 |
+| 跳过 | 内容和新版已经一致 |
+| 你改过 X → 备份到 `.backup/<时间戳>/` 后覆盖 | 全局模块被本地改过，旧版先备份再覆盖 |
 
 ## 3. 执行
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/install.sh" "<目标>" --upgrade
+bash "${CLAUDE_PLUGIN_ROOT}/install.sh" --global --upgrade
 ```
 
-不要顺手加 `--force`：那会连本地改动一起覆盖掉。
+**不要顺手加 `--force`**：它跳过「是否被改过」的判断，代价一样但少了确认这一步。
 
-## 4. 处理冲突
+## 4. 处理「用户改过全局模块」的情况
 
-如果有 `.new` 文件，逐个和原文件 diff，把新版里需要的部分合并进去，然后删掉 `.new`。
-合并完提醒用户：`.agents/.standards-version` 里记录的是**上次安装时**的 hash，
-所以下次升级前最好先跑一次 `install.sh --upgrade` 让清单对上，或手动核对。
+如果汇总里出现备份提示：
+
+1. 告诉用户旧版在 `$GH/.backup/<时间戳>/`，可以随时取回。
+2. 问一句他想保留什么。真想长期定制的话，**不要改全局模块**——
+   把偏离写进项目的 `.agents/project-profile.md` 第 8 节 `overrides`，
+   全局模块保持原样，下次升级就不会冲突。
 
 ## 5. 收尾
 
-告诉用户这次升级了哪些文件、哪些留了 `.new`、还有哪些没动。
+- 强调：升级只影响全局目录，**不需要去任何项目重跑 install**。
+- 说清这次升了哪些文件、备份了几个。

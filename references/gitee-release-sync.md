@@ -498,9 +498,9 @@ API 始终失败时，在 Gitee 仓库 → 发行版 → 创建发行版，填�
 
 | 内容 | 位置 |
 |---|---|
-| 装进目标项目的规则条目（红线、SOP、验证、回滚、坑） | [`.agents/release-gitee.md`](../.agents/release-gitee.md) |
+| 规则条目（红线、SOP、验证、回滚、坑） | [`.agents/release-gitee.md`](../.agents/release-gitee.md)，随全局安装一起带上，不需要按项目装 |
 | 什么时候该加载这份规范 | [`AGENTS.md`](../AGENTS.md) 第 2 节探测表与第 3 节分流表 |
-| 安装器如何判断要不要装这份模块 | 探测脚本的 `gitee_mirror` 事实 + 两个安装器的裁剪分支 |
+| 怎么判断项目真的在同步 Gitee | 探测脚本的 `gitee_mirror` 事实：workflow 调了 Gitee API、用了 `GITEE_TOKEN`，或存在 gitee 远端 |
 | 完整 workflow 模板与参数替换 | 本文件第 6 节 |
 | API 速查与人工补传脚本 | 本文件第 7、8 节 |
 | 项目自己的发布文档应记录什么 | 镜像失败策略、补传步骤、未验证项，写进项目的 [`README.md`](../README.md) 或发布指南 |

@@ -6,14 +6,14 @@ profile 是整套体系里唯一需要按项目改的文件。它不描述"规�
 
 不要让人对着「未定」逐项查。分两步，安装时自动完成第一步：
 
-1. **安装器自动填初稿**：首次 `install.sh` 会用 `scripts/detect-profile.sh` 读 `package.json` / `pom.xml` / `pyproject.toml` / 锁文件 / `Dockerfile` / workflows / `git log`，把项目名、描述、语言版本、包管理器、构建/测试命令、框架、提交风格、部署目标、registry 直接写进 `.agents/project-profile.md`。同一份事实每次结果一致，不靠模型猜。
+1. **安装器自动填初稿**：首次初始化项目时，`install.sh` 会用 `scripts/detect-profile.sh` 读 `package.json` / `pom.xml` / `pyproject.toml` / 锁文件 / `Dockerfile` / workflows / `git log`，把项目名、描述、语言版本、包管理器、构建/测试命令、框架、提交风格、部署目标、registry 直接写进 `.agents/project-profile.md`。同一份事实每次结果一致，不靠模型猜。PowerShell 版不探测，写的是空模板。
 2. **`/ai-dev-standards:profile` 补齐**：只问 4 个必须由人决定的问题——
    - 仓库性质：GitHub 开源 / 个人私有 / 公司内部 → `type`、`visibility`、邮箱策略
    - 提交风格：`[NF]` 前缀 / Conventional / 沿用现状 → `commit_style`
    - 推送策略：只提交 / 允许自动推 / 从不推 → `push_policy`
    - 验证命令现在跑不跑 → `verify_*` 可不可信
 
-**升级不改 profile。** `--upgrade` 会跳过 `.agents/project-profile.md`：里面是项目事实和你手写的结论，模板更新不该覆盖。要按新模板重整时手动跑 `/ai-dev-standards:profile`。
+**profile 永远不会被覆盖。** 项目侧没有升级流程，安装器只在 `.agents/project-profile.md` 不存在时写入；里面是项目事实和你手写的结论，模板更新不该动它。要按新模板重整时手动跑 `/ai-dev-standards:profile`。
 
 **只有人才能决定的事才问**。语言版本、构建命令、部署目标这些问人不如读文件准。
 

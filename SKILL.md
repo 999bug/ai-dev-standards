@@ -1,15 +1,20 @@
 ---
 name: ai-dev-standards
-description: Installs and maintains a layered AI development standards kit into a project repository — AGENTS.md entry, .agents/ task modules, commit-msg hook, CI self-check gate, and a self-check script. Use when the user asks to set up AI coding conventions for a project, initialize or adopt AGENTS.md, apply the same standards across multiple projects, or asks why a project has no AGENTS.md / .agents setup.
+description: Installs a layered AI development standards kit once into a global directory (~/.ai-dev-standards) and initializes each project with only a pointer AGENTS.md, a one-line CLAUDE.md, and .agents/project-profile.md. Use when the user asks to set up AI coding conventions, adopt AGENTS.md across multiple projects, avoid reinstalling standards per repository, or asks why a project has no AGENTS.md / .agents setup.
 ---
 
 # AI 开发规范（安装器）
 
 ## 用途
 
-把一个可复制的分层规范体系装进任意项目：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 14 个模块，配套 `commit-msg` 钩子与 CI 自检，把「规范」从文档里的红线变成会失败的提交与流水线。
+一套分层规范：`AGENTS.md` 做入口（≤150 行）按任务分流，`.agents/` 放 14 个模块，配套 `commit-msg` 钩子与自检脚本，把「规范」从文档里的红线变成会失败的提交。
 
-规范化必须落地到项目根目录，才能被 Codex / Cursor / Claude Code 等工具读到——只在对话里讲规则是没用的。
+**装法分两层，别装反：**
+
+- **全局一次**：规范本体、模块、钩子模板、脚本都放 `~/.ai-dev-standards/`（`AI_DEV_STANDARDS_HOME` 可改）。所有项目共用，升级也只升这一处。
+- **每个项目一次**：只写 `AGENTS.md`（指针）、`CLAUDE.md`（一行）、`.agents/project-profile.md`，外加 `.git/hooks/` 下两个钩子。
+
+项目里必须有入口文件，否则 Codex / Cursor / Claude Code 读不到——这是工具约定，绕不过去。但入口只是一个二十行的指针，真正的内容在全局目录。
 
 ## 获取
 
@@ -21,46 +26,52 @@ description: Installs and maintains a layered AI development standards kit into 
 git clone https://github.com/999bug/ai-dev-standards.git
 ```
 
-或在 GitHub 页面点 **Code → Download ZIP** 解压。不需要安装到任何全局目录，克隆下来就能用。
+也可以直接 clone 到全局位置，省掉复制：
 
-## 安装到目标项目
+```bash
+git clone https://github.com/999bug/ai-dev-standards.git ~/.ai-dev-standards
+```
+
+## 全局安装（先做这个）
 
 ```bash
 cd ai-dev-standards
-./install.sh /path/to/your-project --dry-run          # 先预览
-./install.sh /path/to/your-project --with-ci
+./install.sh --global --dry-run     # 先预览：22 个文件
+./install.sh --global
 ```
 
 Windows：
 
 ```powershell
-.\install.ps1 -Target F:\code\my-project -DryRun
-.\install.ps1 -Target F:\code\my-project -WithCi
+.\install.ps1 -Global -DryRun
+.\install.ps1 -Global
+```
+
+幂等：已是最新时输出「写入 0 个文件」。你改过全局模块的话，`--upgrade` 会先备份到 `.backup/<时间戳>/` 再覆盖。
+
+## 项目初始化（每个项目一次）
+
+```bash
+./install.sh /path/to/your-project --dry-run    # 正常只有 3 个文件 + 2 个钩子
+./install.sh /path/to/your-project
 ```
 
 | 选项 | 作用 |
 | --- | --- |
-| （无） | `AGENTS.md` + `CLAUDE.md` + **与项目相关**的 `.agents/` 模块，并把 git 钩子装进 `.git/hooks/` |
-| `--with-check` | 加 `scripts/check.sh`（七项自检） |
-| `--with-ci` | 加 `.github/workflows/check.yml`，会自动带上 `scripts/check.sh` |
-| `--no-hooks` | 不装 git 钩子（默认是装的） |
-| `--shared-hooks` | 钩子装进项目里的 `.githooks/` 并设 `core.hooksPath`，跟仓库一起提交 |
-| `--upgrade` | 升级已装的规范：没改过的更新，改过的另存为 `.new` |
-| `--all-modules` | 不裁剪，`.agents/` 下 14 个模块全装（旧行为） |
-| `--modules=a,b` | 只装指定模块，例如 `--modules=commit.md,lang-java.md` |
-| `--minimal` | 只装 `AGENTS.md` + `.agents/`，项目根只多 2 个条目 |
-| `--force` | 覆盖已存在文件（默认不覆盖，只跳过并报告） |
+| （无） | 写 `AGENTS.md` 指针、`CLAUDE.md`、`.agents/project-profile.md`，钩子进 `.git/hooks/` |
+| `--no-hooks` | 不装 git 钩子 |
+| `--force` | 覆盖已存在的文件（默认不覆盖，只跳过并报告） |
 | `--dry-run` | 只预览，不落盘 |
 
-**模块按项目裁剪**（默认）：`app/build.gradle.kts` + `AndroidManifest.xml` → Android（同时带签名发版，不再装 Java），`pom.xml`/`build.gradle` → Java，`pyproject.toml` → Python，`package.json` + `vue` → Vue，`.github/workflows/` 或 github remote → 发布规范，`Dockerfile`/`compose` → 容器规范，workflow 里调了 Gitee API / 用了 `GITEE_TOKEN` 或存在 gitee 远端 → 再带 `release-gitee.md`。跨语言的项目档案、提交、纪律、任务工作流、外部对接、老系统方法论始终装。`AGENTS.md` 的分流表会同步删掉未装模块的行，不留悬空引用。
+**默认不覆盖已有文件。** 项目原来就有 `AGENTS.md` 或 `CLAUDE.md` 时，安装器只提示、不落盘——那可能是人家自己的规范，覆盖等于抹掉别人的工作。
 
-**默认不覆盖已存在的文件**：目标项目可能已经改过 `AGENTS.md` 或某个模块，直接覆盖等于抹掉别人的工作。装过一次后再跑不会重写任何东西（写入 0）。
+**旧结构（1.12.x 及更早）只报告不删。** 预览里如果出现 `.agents/commit.md` 之类的模块副本，说明这个项目装的是老版本。安装器会打印清理清单和命令然后退出，**不会删任何文件**；用户清理完再重跑一次，`project-profile.md` 不受影响。
 
-**升级用 `--upgrade`，不要用 `--force`**：安装器在 `.agents/.standards-version` 里记了每个文件的 sha256，hash 对得上才覆盖，对不上就写成 `<文件>.new`，你的改动不会丢。
+**项目侧不需要升级。** 那里只有指针和 profile，内容固定。`--upgrade` 只会作用于全局目录。
 
 ## 安装后必做：补齐 profile
 
-`.agents/project-profile.md` 是整套体系唯一需要按项目改的文件。**首次安装时已经按探测结果填好初稿**（project、语言、构建命令、提交风格等），只剩 `type` / `visibility` / `verify_*` 需要人确认。
+`.agents/project-profile.md` 是整套体系唯一需要按项目改的文件。**首次初始化时已经按探测结果填好初稿**（project、语言、构建命令、提交风格等），只剩 `type` / `visibility` / `verify_*` 需要人确认。
 
 ```
 /ai-dev-standards:profile
@@ -70,8 +81,7 @@ Windows：
 
 **这是整套体系能否生效的关键。** 一份没填完的 profile 比没有 profile 更危险：AI 会拿示例值当事实，用"看起来合理"的默认值代替项目实际情况，然后一路错下去。探测不到的字段留「未定」并列清单，不许猜。
 
-**升级不改这个文件**——项目事实和手写结论不该被模板更新覆盖；要按新模板重整就手动跑 `/ai-dev-standards:profile`。映射表见 [`references/profile-guide.md`](references/profile-guide.md)。
-
+**升级不碰这个文件**——项目事实和手写结论不该被模板更新覆盖。映射表见 [`references/profile-guide.md`](references/profile-guide.md)。
 
 ## 验证
 
@@ -79,12 +89,15 @@ Windows：
 
 > 按你读到的规范回答：① 改 Java 代码前要先读哪个文件？② 提交信息的类型有哪些？
 
-答案应是 `.agents/lang-java.md` 和 `NF/BF/IM/SC/CU/RF/Doc/OT/Tag`。
-
-装了 `--with-check` 的话也可以跑自检：
+答案应是 `lang-java.md` 和 `NF/BF/IM/SC/CU/RF/Doc/OT/Tag`。答不出来先查全局目录可不可读：
 
 ```bash
-cd /path/to/your-project
+cat "${AI_DEV_STANDARDS_HOME:-$HOME/.ai-dev-standards}/AGENTS.md" | head -3
+```
+
+改规范仓库本身时跑自检：
+
+```bash
 bash scripts/check.sh
 ```
 
@@ -92,40 +105,44 @@ bash scripts/check.sh
 
 ## 安装后怎么用
 
-模块**不会自动加载**。`AGENTS.md` 会被入口文件展开，`.agents/` 下的模块靠分流表按需读。
+模块**不会自动加载**。项目 `AGENTS.md` 指针会把模型引到全局 `AGENTS.md`，再按分流表按需读模块。
 
-装了 Claude Code 插件时，会话启动会自动输出一行提醒（`hooks/session-context.sh`，只读不写），不需要再手动说开场白。没装插件的项目仍然要显式说：
+装了 Claude Code 插件时，会话启动会自动输出一行状态（`hooks/session-context.sh`，只读不写）。没装插件的项目仍然要显式说：
 
-> 先读 AGENTS.md 和 .agents/project-profile.md，再按分流表加载本项目需要的模块。
+> 先读全局的 AGENTS.md 和 .agents/project-profile.md，再按分流表加载本项目需要的模块。
 
 三件事决定了这套体系的行为，详见 [`references/how-it-works.md`](references/how-it-works.md)：
 
 1. **分层加载**：`AGENTS.md` 是唯一入口（≤150 行），按第 2、3 节的分流表决定加载哪个模块。400 行的"万能文件"会让模型只记住开头几条。
 2. **规则分三档**：`【红线】` 无例外、`【默认】` 可被 profile 覆盖、`【建议】` 自行权衡。不分档等于没有优先级。
-3. **门禁三层**：提交时 `commit-msg` 拦格式，提交前 `check.sh` 拦断链，push 后 CI 拦历史邮箱。
+3. **门禁两层**：提交时 `commit-msg` 拦格式，改规范时 `check.sh` 拦断链与失效引用。
 
 ## 扩展
 
 加语言或平台模块时，新文件必须在 `AGENTS.md` 第 2、3 节的分流表登记，否则永远不会被加载——`scripts/check.sh` 会拦住这种疏漏。写法见 [`references/extending.md`](references/extending.md)。
 
+全局安装会自动带上所有模块，不需要改安装器；但项目侧不会因此多出文件。
+
 ## 目录结构
 
 ```
 ai-dev-standards/
-├── AGENTS.md                    入口（装到项目的根目录）
-├── CLAUDE.md                    Claude Code 的兼容入口
+├── AGENTS.md                    入口（装到全局目录）
+├── CLAUDE.md                    Claude Code 的兼容入口（仓库自用）
 ├── .agents/                     14 个按任务加载的模块
-│   ├── project-profile.md       项目事实（每个项目唯一要改的文件）
+│   ├── project-profile.md       项目事实模板（初始化时复制进项目）
 │   ├── commit.md · discipline.md · integration.md · legacy.md · task-workflow.md
 │   └── lang-{java,android,python,vue}.md · release-{android,github,docker,gitee}.md
 ├── .claude-plugin/              插件与市场清单（版本号唯一来源）
 ├── commands/                    插件命令：install · upgrade
 ├── hooks/                       SessionStart 上下文提醒（只读）
 ├── scripts/check.sh             七项自检
-├── scripts/release.sh           改版本 + 补 CHANGELOG + 跑自检 + 打 tag
+├── scripts/detect-profile.sh    只读探测，给 profile 填初稿
+├── scripts/release.sh           改版本 + 补 CHANGELOG + 跑自检
 ├── templates/
-│   ├── githooks/                commit-msg · post-commit
-│   └── github/check.yml         CI 模板
+│   ├── githooks/                commit-msg · post-commit（初始化时复制进项目）
+│   ├── project/                 项目侧的 AGENTS.md 指针与 CLAUDE.md 模板
+│   └── github/check.yml         CI 模板（留给要自己搭门禁的项目）
 ├── references/                  profile 填写 · 运作原理 · 扩展写法 · Claude Code 用法 · Gitee 发布同步手册
 ├── install.sh / install.ps1     安装器
 └── reviews/                     待审批的经验提取报告
@@ -135,12 +152,14 @@ ai-dev-standards/
 
 | 现象 | 原因 |
 | --- | --- |
+| 初始化时报「全局规范未安装」 | 先跑 `--global`。命令层会自动串起来，手动跑脚本要分两步 |
+| 初始化时列出 `.agents/commit.md` 等模块 | 旧结构。安装器只报告不删，按打印的命令清理后重跑 |
 | `check.sh` 报"引用了不存在的文件" | 文档里写了不存在的 `.md` 文件名。改文件名或删引用，不要加白名单绕过 |
 | `check.sh` 报"模块没有登记" | 新增了 `.agents/*.md` 但没在 AGENTS.md 分流表登记 |
-| `check.sh` 报"文档里的数字过期" | 「N 个模块」「写入 N 个文件」和仓库实际不一致，按提示改成实际值 |
+| `check.sh` 报"文档里的数字过期" | 「N 个模块」「全局 N 个文件」和仓库实际不一致，按提示改成实际值 |
 | 提交被 `commit-msg` 拒绝 | 格式不符合 `.agents/commit.md`。类型是 `Doc` 不是 `DOC` |
-| AI 还是不看规范 | 开场没说加载，见上面「安装后怎么用」 |
-| 安装时大量文件被跳过 | 目标项目已装过。用 `--upgrade` 更新，或 `--force` 强制覆盖 |
+| AI 还是不看规范 | 指针没被读到。查全局目录是否可读、工具是否允许读工作区外文件 |
+| 同事 clone 后读不到规范 | 规范跟着机器走。让对方也跑一次 `--global` |
 
 ## 许可
 

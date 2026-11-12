@@ -1,5 +1,5 @@
 ---
-description: 把 AI 开发规范装进当前项目（AGENTS.md + .agents/ 模块 + CLAUDE.md + git 钩子）
+description: 全局装一次 AI 开发规范，并初始化当前项目（项目侧只写 3 个文件 + 2 个钩子）
 argument-hint: "[目标项目目录，默认当前目录]"
 ---
 
@@ -12,50 +12,96 @@ argument-hint: "[目标项目目录，默认当前目录]"
 > `ls ~/.claude/plugins/cache/ai-dev-standards/` 找到版本目录，用那个绝对路径代替，
 > 不要凭猜写路径。
 
-## 1. 先确认目标
+这套规范分两层：**规范本体在全局目录**（默认 `~/.ai-dev-standards`，可用
+`AI_DEV_STANDARDS_HOME` 覆盖），**项目里只有指针和项目档案**。
+
+所以这个命令做两件事，顺序不能反：先确保全局已装，再初始化项目。
+
+## 1. 先看全局装没装
+
+```bash
+GH="${AI_DEV_STANDARDS_HOME:-$HOME/.ai-dev-standards}"
+printf '%s\n' "$GH"
+grep -E '^(version|source)=' "$GH/.standards-version" 2>/dev/null
+```
+
+| 结果 | 含义 |
+| --- | --- |
+| 目录不存在 | 第 2 步会装 |
+| `version` 低于插件版本 | 第 2 步会更新 |
+| `version` 与插件版本一致 | 跳过第 2 步，直接进第 3 步 |
+
+插件当前版本：`grep '"version"' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json"`。
+
+## 2. 装 / 更新全局（幂等）
+
+先预览：
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/install.sh" --global --dry-run
+```
+
+Windows 没有 `bash` 时：
+
+```
+pwsh -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/install.ps1" -Global -DryRun
+```
+
+把预览结果贴给用户：会写哪些文件（正常是 22 个）、跳过哪些。
+
+**第一次装全局必须先让用户确认**——这会往家目录写文件。确认后去掉 `--dry-run` 执行。
+之后每次都是幂等的：全是最新时输出「写入 0 个文件」。
+
+如果 `source=git`（全局目录是 clone 的仓库），也可以让用户先 `git -C "$GH" pull --ff-only`
+再跑安装刷新清单。
+
+## 3. 初始化项目
 
 ```bash
 git -C "<目标>" rev-parse --show-toplevel
 ```
 
-- 输出的是仓库根目录就以它为准；不是 git 仓库就用原目录（钩子会被跳过，其余照装）。
-- 目标目录里如果已经有 `.agents/project-profile.md`，说明装过了。**停下来告诉用户**，不要重复装；要升级请让用户改用 `/ai-dev-standards:upgrade`。
+输出的是仓库根就以它为准；不是 git 仓库就用原目录（钩子会跳过，其余照做）。
 
-## 2. 预览（不要跳过）
+先预览：
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/install.sh" "<目标>" --dry-run
 ```
 
-Windows 上没有 `bash` 时改用：
+正常只该看到三样东西：
 
-```
-pwsh -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/install.ps1" -Target "<目标>" -DryRun
-```
+- `.agents/project-profile.md`（并按探测结果填初稿）
+- `AGENTS.md`（指向全局规范的指针）
+- `CLAUDE.md`（一行 `@AGENTS.md`）
 
-把预览结果原样贴给用户：会新增哪些文件、跳过哪些。**等用户确认后再执行第 3 步。**
+外加 `.git/hooks/` 下两个钩子。**如果预览里出现 `.agents/commit.md` 之类的模块，
+说明这是旧结构，不要继续**，见下一节。
 
-## 3. 正式安装
+用户确认后去掉 `--dry-run` 执行。
 
-```bash
-bash "${CLAUDE_PLUGIN_ROOT}/install.sh" "<目标>"
-```
+## 4. 三种特殊情况，别硬装
 
-默认级别＝**与项目相关**的规范模块 + `CLAUDE.md` + `.git/hooks/` 下的两个钩子，不写 CI、不写 `scripts/`。
+| 预览里看到 | 含义 | 怎么做 |
+| --- | --- | --- |
+| 列出 `.agents/commit.md` 等模块 | 这是 1.12.x 及更早的旧结构（规范副本在项目里） | **停下**。安装器只打印清理清单和命令，不会删任何文件。把清单原样贴给用户，等他清理完再重跑 |
+| `! 已有自定义 AGENTS.md，未覆盖` | 项目原来有自己的 AGENTS.md | 不覆盖。告诉用户在文件开头加一段，指明规范在全局目录 |
+| `! 已有自定义 CLAUDE.md，未覆盖` | 项目原来有自己的 CLAUDE.md | 不覆盖。告诉用户在**第一行**加 `@AGENTS.md` |
 
-安装器会按项目裁剪模块：Android 项目装 Android 那份（含签名发版）不装 Java，Java 项目不装 Python/Vue 规范，没用 GitHub 不装发布规范，没有 Docker 不装容器规范，workflow 里没调 Gitee API / 没用 `GITEE_TOKEN` 就不装 Gitee 镜像规范。`AGENTS.md` 的分流表会同步删掉未装模块的行。汇总里会写「模块：7/14（与项目无关，跳过 …）」——如果它判断错了，用 `--modules=` 补装，或 `--all-modules` 全装。
+旧结构清理完，重跑一次本命令即可，profile 不会丢。
 
-用户明确要 CI 或自检脚本时再加 `--with-ci` / `--with-check`；不想装钩子加 `--no-hooks`。
-Windows 等价写法是 `-WithCi` / `-WithCheck` / `-NoHooks` / `-AllModules` / `-Modules`。
+## 5. 报告，然后补 profile
 
-## 4. 报告，然后直接生成 profile
+1. 贴安装器最后几行汇总（写入 / 更新 / 跳过 + 钩子数）。
+2. 说明一句关键事实：**项目侧只有 3 个文件，以后规范升级只跑全局，这个项目不用再动**。
+3. **不要问「要不要帮你填 profile」**：安装器已经按探测结果写了初稿，读
+   `commands/profile.md`，只补 `type` / `visibility` / `verify_*` 这些只有人能决定的。
 
-1. 贴出安装器最后几行汇总（写入 / 更新 / 跳过）。
-2. 提醒一件事：钩子装在 `.git/hooks/`，不进版本控制，团队其他人 clone 后要各自装；
-   想让门禁跟着仓库走，用 `--shared-hooks`（写 `.githooks/` + `core.hooksPath`）。
-3. **不要问「要不要帮你填 profile」**：安装器已经按探测结果写了初稿（项目名、语言、构建命令、
-   提交风格等）。接下来读 `commands/profile.md`，只补还没填的：
-   `type` / `visibility` / `verify_*`（其余「未定」顺手问清）。
+唯一例外：用户明确说"先别填"，告诉他随时可以跑 `/ai-dev-standards:profile`。
 
-别把「补 profile」当成可选项留给用户手填——初稿已经在了，你只差几个只有人能答的选择。
-唯一例外：用户明确说"先别填"，那就告诉他随时可以跑 `/ai-dev-standards:profile`。
+## 6. 钩子的一次性提醒
+
+钩子装在 `.git/hooks/`，不进版本控制，团队其他人 clone 后要各自初始化一次。
+
+项目如果设过 `core.hooksPath`，git 会完全忽略 `.git/hooks/`，安装器会警告——
+按提示 `git config --unset core.hooksPath`，否则钩子装了也不生效。
