@@ -3,6 +3,23 @@
 版本号是插件的更新依据：`plugin.json` 里的 `version` 不变，装了插件的用户就收不到新版。
 发版流程见 `scripts/release.sh`。
 
+## [1.13.1] - 2026-11-12
+
+### 新增
+
+- **升级流程拆成「插件 / 规范本体」两步**：README 与 `references/claude-code.md` 说明 `claude plugin update` 只更新插件缓存里的命令、安装器与模板，不会碰 `~/.ai-dev-standards/`；重进会话后再跑 `/ai-dev-standards:upgrade` 才刷全局目录。顺序反了会拿旧模板比对、判定「内容一致」全部跳过。附版本核对命令、shell 直跑写法与 clone 例外。
+- **补齐 WorkBuddy 的更新流程**：`docs/other-agents.md`、`docs/manual-install.md`、`SKILL.md`、插件 skill 入口与 README 一致说明两层更新——先 `git pull` skill 副本（新开一段对话生效），再用新 skill 的 `install.sh --global --upgrade` 刷全局目录；项目侧不用动。WorkBuddy 没有命名空间斜杠命令，可在对话里说「升级 AI 开发规范」触发。
+- 常见问题表新增两条排查：「插件升了、规范还是旧版」「skill / 插件升了、规范还是旧版」。
+
+### 改进
+
+- **README 重写为「这是什么 → 安装 → 卸载」**：表格对齐，移除 1.12.x 旧结构升级小节（完整流程保留在 `docs/manual-install.md` 第 7、8 节）。
+
+### 修复
+
+- `commands/upgrade.md` 里 `source=repo` 原写「升级跟随插件更新」，容易被读成 `plugin update` 就够；改为 `git pull` 更新规范本体，并补「`source` 只描述规范本体位置，插件缓存始终单独更新」与 `source=copy` 的分流。
+- 修「升级只跑一次」的歧义表述，改成「只升全局这一处，不用每个项目重跑」。
+
 ## [1.13.0] - 2026-11-12
 
 ### 破坏性变更
