@@ -3,6 +3,46 @@
 版本号是插件的更新依据：`plugin.json` 里的 `version` 不变，装了插件的用户就收不到新版。
 发版流程见 `scripts/release.sh`。
 
+## [1.13.0] - 2026-11-12
+
+### 破坏性变更
+
+- **规范从「每个项目装一份」改为「全局装一次」**。1.12.x 及更早版本把 `AGENTS.md`、14 个
+  模块、`CLAUDE.md` 和钩子复制进每个项目：改一条规则要同步 N 个仓库，升级要跑 N 次。
+  现在规范本体装到 `~/.ai-dev-standards/`（可用 `AI_DEV_STANDARDS_HOME` 覆盖），项目里
+  只留 `AGENTS.md`（约二十行指针）、`CLAUDE.md`（一行 `@AGENTS.md`）和
+  `.agents/project-profile.md`。升级只跑一次 `--global --upgrade`，项目侧不需要再动。
+- **删掉六个安装开关**：`--minimal`、`--with-check`、`--with-ci`、`--all-modules`、
+  `--modules=`、`--shared-hooks`。模块全量装在全局目录，按项目裁剪失去意义；项目级
+  CI 自检门禁在新结构下也不成立（CI runner 上没有全局目录）。命中旧参数会明确报错，
+  不静默忽略。
+- **旧项目不会自动迁移**。在 1.12.x 项目里跑初始化，安装器只检测并打印精确的清理命令
+  （`git rm` / `rm -f`），**不删除任何文件**；`project-profile.md` 不在清理范围。
+
+### 新增
+
+- **`install.sh --global` / `install.ps1 -Global`**：把 `AGENTS.md`、14 个模块、
+  `scripts/`、`templates/` 共 22 个文件装到全局目录，写 `.standards-version`
+  （版本 + 每个文件的 sha256 + `source`）。幂等：已是最新时输出「写入 0 个文件」。
+  全局目录可以直接是本仓库（clone 到 `~/.ai-dev-standards`），此时不复制、升级走 `git pull`。
+- **项目初始化只写 3 个文件 + 2 个钩子**：`AGENTS.md` 指针指向全局目录（用
+  `${AI_DEV_STANDARDS_HOME:-$HOME/.ai-dev-standards}` 表达，不写死绝对路径、不把用户名
+  带进仓库）、`CLAUDE.md` 一行 `@AGENTS.md`、`.agents/project-profile.md` 按探测结果
+  填初稿，钩子进 `.git/hooks/`。
+- **`templates/project/`**：项目侧指针模板。指针里给了一条可直接执行的 `cat` 命令，
+  避免模型凭记忆拼路径；读不到时明确要求停下并提示安装，不许凭记忆执行规范。
+
+### 修复
+
+- **全局升级会备份你改过的模块**。`--global --upgrade` 按清单 sha256 判断：没改过的
+  直接覆盖；改过的先复制到 `.backup/<时间戳>/` 再覆盖，汇总里逐条列出，不静默丢改动。
+- **`session-context.sh` 的三态判断**：已接入（报「未定」数）/ 全局装了但本项目没初始化 /
+  全局也没装。以前只有「装过 / 没装过」，新结构下缺了中间态会误导用户重装。
+- **`check.sh` 第 6 项改口径**：对账模块数与「全局 N 个文件」（`module_count + 8`），
+  取消已不存在的「写入 N 个文件」。
+- **路径比较用物理路径**：Windows 下 `F:/x` 与 `/f/x` 是同一个目录，按字符串比会把
+  「全局目录就是本仓库」误判成两份拷贝。
+
 ## [1.12.1] - 2026-11-11
 
 ### 新增
