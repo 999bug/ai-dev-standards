@@ -21,8 +21,11 @@ grep -E '^(version|source)=' "$GH/.standards-version" 2>/dev/null
 | --- | --- |
 | 清单不存在 | 全局还没装过。改用 `/ai-dev-standards:install` |
 | `version` 与插件版本一致 | 已经最新，不用升 |
-| `source=git` | 全局目录是 clone 的仓库，可以 `git -C "$GH" pull --ff-only` 后再跑一次安装刷新清单 |
-| `source=repo` | 全局目录就是插件仓库本身，升级跟随插件更新，跑安装刷新清单即可 |
+| `source=git` | 全局目录是另一处 clone 的仓库，用 `git -C "$GH" pull --ff-only` 更新规范本体，再跑一次 `--global` 刷新清单 |
+| `source=repo` | 全局目录就是当前这个仓库（clone 后原地使用），同样用 `git -C "$GH" pull --ff-only` 更新；**不会**随 `claude plugin update` 自动变化，pull 后跑一次 `--global` 刷新清单 |
+
+> `source` 只说明「规范本体在哪」，插件缓存是另一份，始终要单独 `claude plugin update`。
+> 默认装法 `source=copy` 不走 git，按下面第 2–3 步用新模板覆盖全局目录。
 
 ## 2. 预览
 
