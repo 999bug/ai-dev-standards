@@ -16,13 +16,13 @@
 
 ## 它由什么组成
 
-| 位置 | 内容 | 谁来改 |
-| --- | --- | --- |
-| `~/.ai-dev-standards/` | `AGENTS.md` 入口、14 个模块、钩子与项目模板、自检脚本 | 不手改，跟着升级 |
-| `<项目>/AGENTS.md` | 约 20 行的指针：规范在哪、按什么顺序读 | 内容固定 |
-| `<项目>/CLAUDE.md` | 一行 `@AGENTS.md` | 内容固定 |
-| `<项目>/.agents/project-profile.md` | 项目事实：语言版本、构建命令、提交身份、例外 | **每个项目必改** |
-| `<项目>/.git/hooks/` | `commit-msg`、`post-commit` | 不用管 |
+| 位置                                | 内容                                 | 谁来改        |
+| --------------------------------- | ---------------------------------- | ---------- |
+| `~/.ai-dev-standards/`            | `AGENTS.md` 入口、14 个模块、钩子与项目模板、自检脚本 | 不手改，跟着升级   |
+| `<项目>/AGENTS.md`                  | 约 20 行的指针：规范在哪、按什么顺序读              | 内容固定       |
+| `<项目>/CLAUDE.md`                  | 一行 `@AGENTS.md`                    | 内容固定       |
+| `<项目>/.agents/project-profile.md` | 项目事实：语言版本、构建命令、提交身份、例外             | **每个项目必改** |
+| `<项目>/.git/hooks/`                | `commit-msg`、`post-commit`         | 不用管        |
 
 全局目录一次装 22 个文件；项目侧只多 3 个文件，钩子不占根目录条目。
 
@@ -113,34 +113,39 @@ claude plugin marketplace remove ai-dev-standards
 
 ## 升级
 
-```text
-/ai-dev-standards:upgrade
+**两步，顺序不能反。** 规范本体不是插件文件，是安装器第一次运行时写进全局目录的产物；`claude plugin update` 只更新插件缓存，不会碰它，也不会提示版本落后。
+
+```bash
+claude plugin update ai-dev-standards@ai-dev-standards   # ① 升插件：命令、安装器、模板
+# 退出会话重进，新命令才会加载；第三方市场默认不开自动更新
 ```
 
-只升全局目录，项目侧不用动。改过的全局模块会先备份到 `.backup/<时间戳>/` 再覆盖。
+```text
+/ai-dev-standards:upgrade                                # ② 升全局规范本体
+```
+
+② 只升 `~/.ai-dev-standards/` 这一处，所有项目同时生效。项目侧 3 个文件 + 2 个钩子内容固定，**不用重跑 install**。改过的全局模块会先备份到 `.backup/<时间戳>/` 再覆盖。
+
+顺序反了会静默失效：旧安装器拿旧模板比对，判定「内容一致」全部跳过。核对版本：`grep '^version=' ~/.ai-dev-standards/.standards-version`。
+
+斜杠命令只是壳，直接在 shell 跑 `bash ~/.claude/plugins/cache/ai-dev-standards/<版本>/install.sh --global --upgrade` 等价，代价是自己找版本目录、自己看预览。
+
+### 例外：全局目录是 clone 的仓库
+
+清单里 `source=git` / `source=repo` 时，`git -C ~/.ai-dev-standards pull --ff-only` 就能更新规范本体，不必跑 ②；插件缓存那份仍要单独更新。
 
 想定制规则，写进项目 `.agents/project-profile.md` 第 8 节 `overrides`，不要改全局模块。
 
-## 从 1.12.x 或更早升级
-
-老版本把模块复制进了项目。在旧项目里跑一次初始化，它只打印清理清单和命令，**不删文件**：
-
-```bash
-~/.ai-dev-standards/install.sh /path/to/old-project
-```
-
-按提示清理后重跑一次，`project-profile.md` 不受影响。细节见 [docs/manual-install.md](docs/manual-install.md)。
-
 ## 支持哪些工具
 
-| 工具 | 入口 | 额外动作 |
-| --- | --- | --- |
-| Claude Code | 项目 `CLAUDE.md` | 无（初始化时已带上） |
-| WorkBuddy | 项目 `AGENTS.md` | 无 |
-| Codex | 项目 `AGENTS.md` | 无 |
-| Cursor | 项目 `AGENTS.md` | 无 |
-| opencode | 项目 `AGENTS.md` | 无 |
-| GitHub Copilot | 项目 `AGENTS.md` | 无 |
+| 工具             | 入口             | 额外动作       |
+| -------------- | -------------- | ---------- |
+| Claude Code    | 项目 `CLAUDE.md` | 无（初始化时已带上） |
+| WorkBuddy      | 项目 `AGENTS.md` | 无          |
+| Codex          | 项目 `AGENTS.md` | 无          |
+| Cursor         | 项目 `AGENTS.md` | 无          |
+| opencode       | 项目 `AGENTS.md` | 无          |
+| GitHub Copilot | 项目 `AGENTS.md` | 无          |
 
 各工具的验证问题与官方文档：[docs/other-agents.md](docs/other-agents.md)
 
@@ -148,13 +153,14 @@ claude plugin marketplace remove ai-dev-standards
 
 ## 常见问题
 
-| 现象 | 处理 |
-| --- | --- |
-| 初始化报「全局规范未安装」 | 先跑 `--global`，或用 `/ai-dev-standards:install` 让它自己串起来 |
-| 初始化列出 `.agents/commit.md` 等模块 | 旧结构。安装器只报告不删，按打印的命令清理后重跑 |
-| 同事 clone 后读不到规范 | 规范跟着机器走，让对方也跑一次 `--global` |
-| Claude Code 读不到规范 | 查项目 `CLAUDE.md` 首行是不是 `@AGENTS.md`；`/init` 会把它冲掉 |
-| 提交被拒绝 | 格式不符合 `.agents/commit.md`。类型是 `Doc` 不是 `DOC` |
+| 现象                            | 处理                                                   |
+| ----------------------------- | ---------------------------------------------------- |
+| 初始化报「全局规范未安装」                 | 先跑 `--global`，或用 `/ai-dev-standards:install` 让它自己串起来 |
+| 初始化列出 `.agents/commit.md` 等模块 | 旧结构。安装器只报告不删，按打印的命令清理后重跑                             |
+| 同事 clone 后读不到规范               | 规范跟着机器走，让对方也跑一次 `--global`                           |
+| Claude Code 读不到规范             | 查项目 `CLAUDE.md` 首行是不是 `@AGENTS.md`；`/init` 会把它冲掉     |
+| 提交被拒绝                         | 格式不符合 `.agents/commit.md`。类型是 `Doc` 不是 `DOC`         |
+| 插件升了、规范还是旧版                  | `plugin update` 只升插件缓存，还要跑 `/ai-dev-standards:upgrade`          |
 
 更多问题：[docs/manual-install.md](docs/manual-install.md)
 
@@ -163,7 +169,7 @@ claude plugin marketplace remove ai-dev-standards
 - **入口必须短**：`AGENTS.md` 限 150 行，因为模型读长文档时开头权重远高于结尾
 - **规则分三档**：红线 / 默认 / 建议，不分档等于没有优先级
 - **模块按任务加载**：一次只读 1–2 个，不把 14 个模块全塞进上下文
-- **规范跟机器走**：所以升级只跑一次，代价是同事要各自装一次全局
+- **规范跟机器走**：升级只升全局这一处，不用每个项目重跑；代价是同事要各自装一次全局
 
 细节见 [references/how-it-works.md](references/how-it-works.md)。
 

@@ -45,13 +45,22 @@ claude plugin install ai-dev-standards --marketplace 999bug/ai-dev-standards
 
 命令分两步：先确认全局目录（`~/.ai-dev-standards/`）装了没有、是不是最新，再初始化当前项目——写 `AGENTS.md` 指针、`CLAUDE.md`、`.agents/project-profile.md`，钩子进 `.git/hooks/`。两步都先 `--dry-run` 给你看要写什么。
 
-更新规范：
+更新规范要两步：先升插件，再升规范本体。
+
+```bash
+claude plugin update ai-dev-standards@ai-dev-standards
+# 退出会话重进，新命令才会加载；第三方市场默认不开自动更新
+```
 
 ```text
 /ai-dev-standards:upgrade
 ```
 
+`claude plugin update` 只把新版命令、安装器和模板复制进插件缓存，**不会**碰 `~/.ai-dev-standards/`——规范本体是安装器第一次运行时写进去的产物，而 Claude Code 没有 post-install 钩子。顺序反了会拿旧模板比对、判定「内容一致」全部跳过。
+
 只升全局目录。项目侧没有模块副本，不需要升级。你改过的全局模块会先备份到 `.backup/<时间戳>/` 再覆盖，**不要用 `--force` 代替**。
+
+全局目录若就是 clone 的仓库（`source=git` / `source=repo`），`git -C ~/.ai-dev-standards pull --ff-only` 即可更新规范本体，不必跑 upgrade 命令。
 
 ### 发布侧：改版本 → 打 tag
 
