@@ -56,6 +56,18 @@ Read <插件根>/SKILL.md
 
 5. 填 `.agents/project-profile.md`：从项目里读事实，能推断的直接填，推断不了的一次性列出来问用户。字段说明见 `<插件根>/references/profile-guide.md`。
 
+## 升级
+
+用户说「升级规范」时：**先更新仓库副本，再用新安装器刷全局目录**，顺序不能反（旧版安装器可能没有 `--global`）。
+
+```bash
+git -C <仓库根> pull --ff-only          # 插件用户换成 claude plugin update，并退出会话重进
+bash <仓库根>/install.sh --global --upgrade --dry-run
+bash <仓库根>/install.sh --global --upgrade
+```
+
+`<仓库根>`：插件用户是 `${CLAUDE_PLUGIN_ROOT}`，WorkBuddy 用户是 `~/.workbuddy/skills/ai-dev-standards/`。项目侧不用动，详见插件根 `SKILL.md` 的「更新」章节。
+
 ## 边界
 
 - 不覆盖已有文件；全局升级只走 `--global --upgrade`，不加 `--force`。

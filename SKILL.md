@@ -69,6 +69,22 @@ Windows：
 
 **项目侧不需要升级。** 那里只有指针和 profile，内容固定。`--upgrade` 只会作用于全局目录。
 
+## 更新（全局一次）
+
+规范本体是安装产物，不会随代码仓库或 skill 副本自动更新。**两层，顺序不能反。**
+
+WorkBuddy 的 skill 是 clone 的仓库：先 pull 拿到新安装器；靠对话触发升级时还要**新开一段对话**加载新 skill。
+
+```bash
+git -C ~/.workbuddy/skills/ai-dev-standards pull --ff-only
+bash ~/.workbuddy/skills/ai-dev-standards/install.sh --global --upgrade --dry-run
+bash ~/.workbuddy/skills/ai-dev-standards/install.sh --global --upgrade
+```
+
+Claude Code 插件用户把第一步换成 `claude plugin update ai-dev-standards@ai-dev-standards`（退出会话重进），第二步换成 `/ai-dev-standards:upgrade`，见 [`references/claude-code.md`](references/claude-code.md)。
+
+顺序反了会拿到旧安装器：1.10.0 的安装器只有项目模式的 `--upgrade`，没有 `--global`。项目侧不用动，别去项目里跑 upgrade。完整流程见 [`docs/manual-install.md`](docs/manual-install.md)。
+
 ## 安装后必做：补齐 profile
 
 `.agents/project-profile.md` 是整套体系唯一需要按项目改的文件。**首次初始化时已经按探测结果填好初稿**（project、语言、构建命令、提交风格等），只剩 `type` / `visibility` / `verify_*` 需要人确认。
@@ -160,6 +176,7 @@ ai-dev-standards/
 | 提交被 `commit-msg` 拒绝 | 格式不符合 `.agents/commit.md`。类型是 `Doc` 不是 `DOC` |
 | AI 还是不看规范 | 指针没被读到。查全局目录是否可读、工具是否允许读工作区外文件 |
 | 同事 clone 后读不到规范 | 规范跟着机器走。让对方也跑一次 `--global` |
+| skill / 插件升了、规范还是旧版 | 只更新了副本，还要用新安装器跑 `--global --upgrade`；顺序反了会拿到旧模板 |
 
 ## 许可
 

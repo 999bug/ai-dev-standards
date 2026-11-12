@@ -253,3 +253,5 @@ AI_DEV_STANDARDS_SKIP=1 claude
 | 额外机制 | 插件命令安装 + SessionStart 上下文提醒 | skill 可按需触发安装器 |
 
 两边读同一份全局 `AGENTS.md` 和 `.agents/`，不需要维护两套。改规则只改全局目录，两个工具同时生效。
+
+WorkBuddy 侧的更新是 `git -C ~/.workbuddy/skills/ai-dev-standards pull --ff-only` 拿到新安装器，再用它跑 `--global --upgrade`；顺序不能反，项目侧不用动。见 [`../docs/other-agents.md`](../docs/other-agents.md)。

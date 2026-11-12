@@ -182,6 +182,10 @@ SKIP_CODEGRAPH_SYNC=1 git commit ...
 
 ## 7. 更新
 
+不管用哪个工具，更新都是「先拿到新代码 → 再用新安装器刷全局目录」，顺序不能反。
+
+仓库若是 clone 到 WorkBuddy 的 skill 目录，把下面的 `cd ai-dev-standards` 换成 `cd ~/.workbuddy/skills/ai-dev-standards`；跑完**新开一段对话**让新 skill 生效。WorkBuddy 没有斜杠命令，也可以直接在对话里说「升级 AI 开发规范」让 skill 触发。项目侧不用动。
+
 ```bash
 cd ai-dev-standards
 git pull

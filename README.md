@@ -134,6 +134,19 @@ claude plugin update ai-dev-standards@ai-dev-standards   # ① 升插件：命�
 
 清单里 `source=git` / `source=repo` 时，`git -C ~/.ai-dev-standards pull --ff-only` 就能更新规范本体，不必跑 ②；插件缓存那份仍要单独更新。
 
+### WorkBuddy / 不用插件时
+
+没有 `/ai-dev-standards:upgrade`，那是 Claude Code 插件的命名空间命令。更新同样两层，第一层换成 `git pull`：
+
+```bash
+git -C ~/.workbuddy/skills/ai-dev-standards pull --ff-only   # ① 更新 skill 副本
+# 新开一段对话让新 skill 生效
+bash ~/.workbuddy/skills/ai-dev-standards/install.sh --global --upgrade --dry-run
+bash ~/.workbuddy/skills/ai-dev-standards/install.sh --global --upgrade   # ② 刷新全局目录
+```
+
+顺序不能反：旧版 skill 的安装器可能没有 `--global`（1.10.0 就只有项目模式的 `--upgrade`）。项目侧仍不用动。完整流程与排错见 [docs/manual-install.md](docs/manual-install.md)。
+
 想定制规则，写进项目 `.agents/project-profile.md` 第 8 节 `overrides`，不要改全局模块。
 
 ## 支持哪些工具

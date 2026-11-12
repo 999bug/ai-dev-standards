@@ -55,6 +55,26 @@ cd ai-dev-standards
 
 WorkBuddy 会把项目根的 `AGENTS.md` 作为项目规范读进上下文，不需要额外入口文件；指针会把它引到全局目录。
 
+### 更新
+
+skill 是 clone 的仓库，更新也是两层，顺序不能反：
+
+```bash
+# ① 更新 skill 副本；项目级 skill 换成对应路径
+git -C ~/.workbuddy/skills/ai-dev-standards pull --ff-only
+```
+
+**新开一段对话**才会加载新 skill，然后用它的安装器刷新全局目录：
+
+```bash
+bash ~/.workbuddy/skills/ai-dev-standards/install.sh --global --upgrade --dry-run
+bash ~/.workbuddy/skills/ai-dev-standards/install.sh --global --upgrade
+```
+
+顺序反了会拿到旧安装器：1.10.0 的安装器只有项目模式的 `--upgrade`，没有 `--global`，升不了全局目录。
+
+WorkBuddy 没有 `/ai-dev-standards:upgrade` 这类命名空间命令，靠 skill 的 `description` 触发 + 自然语言——不想记命令，就在对话里说「升级 AI 开发规范」。项目侧不用动；全局目录若本身是 clone 的仓库，`git -C ~/.ai-dev-standards pull --ff-only` 一次即可，但 skill 副本仍要单独 pull。完整流程见 [手动安装第 7 节](manual-install.md)。
+
 ### 验证
 
 新会话里问：
